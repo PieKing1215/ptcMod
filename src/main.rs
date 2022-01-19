@@ -6,12 +6,12 @@ use sysinfo::{ProcessExt, System, SystemExt};
 mod inject;
 
 fn main() {
-    println!("PxTone Mod Injector");
+    println!("PTC Mod Injector");
 
     if let Some(handle) = get_ptc_handle() {
         inject::inject_dll(
             handle.0,
-            Path::new("target/i686-pc-windows-gnu/debug/cheat.dll"),
+            Path::new("target/i686-pc-windows-gnu/debug/ptc_mod.dll"),
         )
         .unwrap();
     }

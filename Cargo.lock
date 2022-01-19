@@ -299,7 +299,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pxtone-mod"
+name = "ptc-mod"
 version = "0.1.0"
 dependencies = [
  "anyhow",

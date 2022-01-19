@@ -1,5 +1,5 @@
 [package]
-name = "pxtone-mod"
+name = "ptc-mod"
 version = "0.1.0"
 edition = "2018"
 
@@ -18,5 +18,5 @@ anyhow = "1.0"
 colorsys = "0.6.5"
 
 [lib]
-name = "cheat"
+name = "ptc_mod"
 crate-type = ["dylib"]
