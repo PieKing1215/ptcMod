@@ -45,6 +45,8 @@ Currently only applies in unit view; will be extended to keyboard view at some p
 # Planned Features
 More scrolling options - like snap to beat, or only scroll when the playhead is close to the right of the screen.
 
+Playhead timing adjustment (so you can compensate for latency)
+
 Remove/raise the project title editor character limit since it saves/loads longer names just fine.
 
 Increase the number of buffer measures after the end of the song so you can scroll further.
