@@ -1,5 +1,6 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use path_absolutize::Absolutize;
 use process_memory::{Pid, ProcessHandle, TryIntoProcessHandle};
 use sysinfo::{ProcessExt, System, SystemExt, PidExt};
 
@@ -8,12 +9,47 @@ mod inject;
 fn main() {
     println!("PTC Mod Injector");
 
+    // basically if there's a ptc_mod.dll in the working directory, use it.
+    // otherwise if running using cargo, look in the right target/ folder for it
+
+    let mut try_paths = Vec::new();
+    try_paths.push(PathBuf::from("./ptc_mod.dll"));
+    println!("{:?}", option_env!("OUT_DIR"));
+
+    if let Some(p) = option_env!("OUT_DIR") {
+        let p = PathBuf::from(p);
+        // eg navigate from
+        // target/i686-pc-windows-gnu/debug/build/ptc-mod-xxxxxxxx/out/
+        // to
+        // target/i686-pc-windows-gnu/debug/ptc_mod.dll
+        let p = p.parent().and_then(Path::parent).and_then(Path::parent).map(|p| p.clone().to_path_buf());
+        if let Some(mut p) = p {
+            p.push("ptc_mod.dll");
+            try_paths.push(p);
+        }
+    }
+
     if let Some(handle) = get_ptc_handle() {
-        inject::inject_dll(
-            handle.0,
-            Path::new("target/i686-pc-windows-gnu/debug/ptc_mod.dll"), // TODO: hardcoded, make a build.rs to use OUT_DIR
-        )
-        .unwrap();
+        for path in try_paths {
+            if path.exists() {
+                let path = path.absolutize().map_or(path.clone(), |abs| abs.to_path_buf());
+                println!("Attempting to inject ptc_mod.dll @ {:?}", path);
+
+                let res = inject::inject_dll(
+                    handle.0,
+                    path.as_path(),
+                );
+
+                if let Err(e) = res {
+                    eprintln!("{:?}", e);
+                } else {
+                    break;
+                }
+            } else {
+                let path = path.absolutize().map_or(path.clone(), |abs| abs.to_path_buf());
+                println!("Missing ptc_mod.dll @ {:?}", path);
+            }
+        }
     }
 }
 
