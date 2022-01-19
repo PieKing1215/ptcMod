@@ -124,9 +124,9 @@ impl PTCVersion for PTC0925 {
 
     fn get_patches() -> Vec<Patch> {
         vec![Patch::new(vec![
-            PatchByte::new(addr(0x00D467f3 - 0xd30000), 0x01, 0x00),
-            PatchByte::new(addr(0x00D46808 - 0xd30000), 0x01, 0x72),
-            PatchByte::new(addr(0x00D46809 - 0xd30000), 0x01, 0xe8),
+            PatchByte::new(addr(0x00d467f3 - 0xd30000), 0x01, 0x00),
+            PatchByte::new(addr(0x00d46808 - 0xd30000), 0x01, 0x72),
+            PatchByte::new(addr(0x00d46809 - 0xd30000), 0x01, 0xe8),
         ])]
     }
 

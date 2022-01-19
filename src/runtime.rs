@@ -164,7 +164,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             //     std::ptr::null_mut(),
             // );
 
-            let window_thread = winuser::GetWindowThreadProcessId(*hwnd, 0 as *mut u32);
+            let window_thread = winuser::GetWindowThreadProcessId(*hwnd, std::ptr::null_mut());
             let (tx, rx) = std::sync::mpsc::channel::<()>();
             SENDER = Some(tx);
             let event_hook = winuser::SetWindowsHookExW(
@@ -324,6 +324,12 @@ impl<PTC: PTCVersion> Runtime<PTC> {
         }
 
         Ok(())
+    }
+}
+
+impl<PTC: PTCVersion> Default for Runtime<PTC> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -571,8 +577,8 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
         // );
         winuser::RedrawWindow(
             *PTC::get_hwnd(),
-            0 as *const _,
-            0 as *mut _,
+            std::ptr::null(),
+            std::ptr::null_mut(),
             winuser::RDW_INTERNALPAINT,
         );
     }
@@ -643,14 +649,14 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
 
                             let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
                             VirtualProtect(
-                                crate::ptc::addr(0x00D467f3 - 0xd30000) as *mut libc::c_void,
+                                crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
                                 0x1,
                                 PAGE_EXECUTE_READWRITE,
                                 &mut lpfl_old_protect_1,
                             );
-                            *(crate::ptc::addr(0x00D467f3 - 0xd30000) as *mut u8) = 0x01;
+                            *(crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut u8) = 0x01;
                             VirtualProtect(
-                                crate::ptc::addr(0x00D467f3 - 0xd30000) as *mut libc::c_void,
+                                crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
                                 0x1,
                                 lpfl_old_protect_1,
                                 &mut lpfl_old_protect_1,
@@ -696,14 +702,14 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
 
                             let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
                             VirtualProtect(
-                                crate::ptc::addr(0x00D467f3 - 0xd30000) as *mut libc::c_void,
+                                crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
                                 0x1,
                                 PAGE_EXECUTE_READWRITE,
                                 &mut lpfl_old_protect_1,
                             );
-                            *(crate::ptc::addr(0x00D467f3 - 0xd30000) as *mut u8) = 0;
+                            *(crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut u8) = 0;
                             VirtualProtect(
-                                crate::ptc::addr(0x00D467f3 - 0xd30000) as *mut libc::c_void,
+                                crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
                                 0x1,
                                 lpfl_old_protect_1,
                                 &mut lpfl_old_protect_1,
@@ -1008,9 +1014,9 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
             // let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
             // winuser::MessageBoxW(msg.hwnd, l_msg.as_ptr(), l_title.as_ptr(), winuser::MB_OK | winuser::MB_ICONINFORMATION);
 
-            match msg.wParam {
-                _ => {}
-            }
+            // match msg.wParam {
+            //     _ => {}
+            // }
         }
 
         winuser::CallNextHookEx(std::ptr::null_mut(), code, w_param, l_param)
@@ -1104,7 +1110,7 @@ fn frame_thread<PTC: PTCVersion>(_base: LPVOID) -> anyhow::Result<()> {
                 // *PTC::get_scroll() += des_scroll - old_scroll;
                 winuser::InvalidateRect(
                     *PTC::get_hwnd(),
-                    0 as *const winapi::shared::windef::RECT,
+                    std::ptr::null(),
                     0,
                 );
                 // winuser::UpdateWindow(*PTC::get_hwnd());

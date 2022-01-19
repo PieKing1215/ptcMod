@@ -12,8 +12,9 @@ fn main() {
     // basically if there's a ptc_mod.dll in the working directory, use it.
     // otherwise if running using cargo, look in the right target/ folder for it
 
-    let mut try_paths = Vec::new();
-    try_paths.push(PathBuf::from("./ptc_mod.dll"));
+    let mut try_paths = vec![
+        PathBuf::from("./ptc_mod.dll"),
+    ];
     println!("{:?}", option_env!("OUT_DIR"));
 
     if let Some(p) = option_env!("OUT_DIR") {
@@ -26,7 +27,7 @@ fn main() {
             .parent()
             .and_then(Path::parent)
             .and_then(Path::parent)
-            .map(|p| p.clone().to_path_buf());
+            .map(|p| p.to_path_buf());
         if let Some(mut p) = p {
             p.push("ptc_mod.dll");
             try_paths.push(p);

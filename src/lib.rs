@@ -143,7 +143,8 @@ fn attach() -> anyhow::Result<()> {
                 winuser::MB_OK | winuser::MB_ICONERROR,
             );
         }
-        return Ok(());
+
+        Ok(())
     }
 }
 
@@ -154,7 +155,7 @@ fn detach() -> anyhow::Result<()> {
 }
 
 unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
-    match std::panic::catch_unwind(|| attach()) {
+    match std::panic::catch_unwind(attach) {
         Err(err) => {
             let l_msg: Vec<u16> = format!("attach panicked: {:?}\0", err)
                 .encode_utf16()
@@ -182,7 +183,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
         Ok(Ok(())) => {}
     }
 
-    match std::panic::catch_unwind(|| detach()) {
+    match std::panic::catch_unwind(detach) {
         Err(err) => {
             let l_msg: Vec<u16> = format!("detach panicked: {:?}\0", err)
                 .encode_utf16()
@@ -234,7 +235,7 @@ pub extern "stdcall" fn DllMain(
         },
         winapi::um::winnt::DLL_PROCESS_DETACH => {
             if !lp_reserved.is_null() {
-                match std::panic::catch_unwind(|| detach()) {
+                match std::panic::catch_unwind(detach) {
                     Err(err) => {
                         let l_msg: Vec<u16> = format!("detach panicked: {:?}\0", err)
                             .encode_utf16()
