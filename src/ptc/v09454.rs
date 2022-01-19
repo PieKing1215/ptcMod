@@ -127,8 +127,8 @@ impl PTCVersion for PTC09454 {
         todo!()
     }
 
-    fn get_hook_draw_unit_note_rect() -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
+    fn get_hook_draw_unit_note_rect(
+    ) -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
         todo!()
     }
-    
 }

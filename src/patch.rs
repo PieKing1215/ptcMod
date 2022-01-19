@@ -1,4 +1,3 @@
-
 #[derive(Clone)]
 pub struct Patch {
     bytes: Vec<PatchByte>,
@@ -13,18 +12,12 @@ pub struct PatchByte {
 
 impl Patch {
     pub fn new(bytes: Vec<PatchByte>) -> Self {
-        Self {
-            bytes,
-        }
+        Self { bytes }
     }
 }
 
 impl PatchByte {
     pub fn new(addr: usize, old: u8, new: u8) -> Self {
-        Self {
-            addr,
-            old,
-            new,
-        }
+        Self { addr, old, new }
     }
 }

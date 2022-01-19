@@ -18,10 +18,11 @@ use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE};
 /// Injects the dll at `dll_path` into the given process
 pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
     let dll_path = dll_path.canonicalize()?;
-    
+
     println!("dll_path = {:?}", dll_path);
 
-    let dll_path = CString::new(dll_path.to_str().expect("Invalid dll path (to_str)")).expect("Invalid dll path (CString::new)");
+    let dll_path = CString::new(dll_path.to_str().expect("Invalid dll path (to_str)"))
+        .expect("Invalid dll path (CString::new)");
 
     let path_size = dll_path.as_bytes_with_nul().len();
 

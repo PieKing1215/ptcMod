@@ -114,27 +114,20 @@ impl PTCVersion for PTC0925 {
     fn get_scroll_max() -> i32 {
         unsafe {
             *(addr(0xa6d70 + 0x10) as *mut i32)
-            - (
-                *(addr(0xa6d70 + 0x64) as *mut i32)
-                - *(addr(0xa6d70 + 0x5c) as *mut i32)
-            )
+                - (*(addr(0xa6d70 + 0x64) as *mut i32) - *(addr(0xa6d70 + 0x5c) as *mut i32))
         }
     }
 
     fn get_unit_rect() -> &'static [i32; 4] {
-        unsafe {
-            &*(addr(0xa693c) as *const [i32; 4])
-        }
+        unsafe { &*(addr(0xa693c) as *const [i32; 4]) }
     }
 
     fn get_patches() -> Vec<Patch> {
-        vec![
-            Patch::new(vec![
-                PatchByte::new(addr(0x00D467f3 - 0xd30000), 0x01, 0x00),
-                PatchByte::new(addr(0x00D46808 - 0xd30000), 0x01, 0x72),
-                PatchByte::new(addr(0x00D46809 - 0xd30000), 0x01, 0xe8),
-            ]),
-        ]
+        vec![Patch::new(vec![
+            PatchByte::new(addr(0x00D467f3 - 0xd30000), 0x01, 0x00),
+            PatchByte::new(addr(0x00D46808 - 0xd30000), 0x01, 0x72),
+            PatchByte::new(addr(0x00D46809 - 0xd30000), 0x01, 0xe8),
+        ])]
     }
 
     fn get_hook_draw_unitkb_top() -> unsafe extern "stdcall" fn() {
@@ -151,12 +144,14 @@ impl PTCVersion for PTC0925 {
         draw_unitkb_bg
     }
 
-    fn get_hook_draw_unit_note_rect() -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
-        unsafe extern "cdecl" fn draw_unit_note_rect(rect: *const libc::c_int, color: libc::c_uint) {
+    fn get_hook_draw_unit_note_rect(
+    ) -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
+        unsafe extern "cdecl" fn draw_unit_note_rect(
+            rect: *const libc::c_int,
+            color: libc::c_uint,
+        ) {
             crate::runtime::draw_unit_note_rect::<PTC0925>(rect, color)
         }
         draw_unit_note_rect
     }
-
-    
 }

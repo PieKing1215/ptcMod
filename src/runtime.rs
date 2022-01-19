@@ -2,16 +2,11 @@ use std::{convert::TryInto, marker::PhantomData, sync::mpsc::Sender, time::Insta
 
 use colorsys::ColorTransform;
 use log::LevelFilter;
-use simplelog::{CombinedLogger, Config, TerminalMode, ColorChoice, TermLogger};
+use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 use winapi::{
-    shared::{
-        minwindef::LPVOID,
-        windef::HWND,
-    },
+    shared::{minwindef::LPVOID, windef::HWND},
     um::{
-        libloaderapi::GetModuleHandleA,
-        memoryapi::VirtualProtect,
-        winnt::{PAGE_EXECUTE_READWRITE},
+        libloaderapi::GetModuleHandleA, memoryapi::VirtualProtect, winnt::PAGE_EXECUTE_READWRITE,
         winuser,
     },
 };
@@ -19,7 +14,7 @@ use winapi::{
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
 const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
-use crate::ptc::{PTCVersion, addr};
+use crate::ptc::{addr, PTCVersion};
 
 const M_SMOOTH_SCROLL_ID: usize = 1001;
 const M_FPS_UNLOCK: usize = 1002;
@@ -43,13 +38,10 @@ pub fn try_run_version(version: (u16, u16, u16, u16)) -> Option<anyhow::Result<(
 
 impl<PTC: PTCVersion> Runtime<PTC> {
     pub fn new() -> Self {
-        Self {
-            _phantom: PhantomData,
-        }
+        Self { _phantom: PhantomData }
     }
 
     pub fn main(&mut self) -> anyhow::Result<()> {
-
         CombinedLogger::init(vec![TermLogger::new(
             LevelFilter::Debug,
             Config::default(),
@@ -58,7 +50,11 @@ impl<PTC: PTCVersion> Runtime<PTC> {
         )])
         .unwrap();
 
-        let pid = unsafe { winapi::um::processthreadsapi::GetProcessId(winapi::um::processthreadsapi::GetCurrentProcess()) };
+        let pid = unsafe {
+            winapi::um::processthreadsapi::GetProcessId(
+                winapi::um::processthreadsapi::GetCurrentProcess(),
+            )
+        };
         log::info!("PTC Mod starting...");
         log::info!("mod version = {}", VERSION.unwrap_or("unknown"));
         log::info!("PID = {}", pid);
@@ -84,9 +80,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 v4,
                 VERSION.unwrap_or("unknown"),
             );
-            let l_msg: Vec<u16> = 
-            msg.encode_utf16()
-            .collect();
+            let l_msg: Vec<u16> = msg.encode_utf16().collect();
             let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
             winuser::MessageBoxW(
                 *hwnd,
@@ -209,7 +203,8 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
             // call ptCollage.exe+87A0
             let bytes = i32::to_le_bytes(0x87a0 - (0x16625 + 0x5));
-            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) =
+                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
             VirtualProtect(
                 crate::ptc::addr(0x16625) as *mut libc::c_void,
@@ -230,7 +225,8 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
             // call ptCollage.exe+87A0
             let bytes = i32::to_le_bytes(0x9f80 - (0x166c0 + 0x5));
-            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) =
+                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
             VirtualProtect(
                 crate::ptc::addr(0x166c0) as *mut libc::c_void,
@@ -251,7 +247,8 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
             // call ptCollage.exe+1c0e0
             let bytes = i32::to_le_bytes(0x1c0e0 - (0x1469f + 0x5));
-            *(crate::ptc::addr(0x1469f) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+            *(crate::ptc::addr(0x1469f) as *mut [u8; 5]) =
+                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
             VirtualProtect(
                 crate::ptc::addr(0x1469f) as *mut libc::c_void,
@@ -337,7 +334,10 @@ static mut LAST_PLAYHEAD_POS: i32 = 0;
 
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
 //      which can be used to get the unit and focus state (which could be used to get the original color anyway)
-pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_int, ebp: libc::c_uint) {
+pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
+    rect: *const libc::c_int,
+    ebp: libc::c_uint,
+) {
     // color = 0x0094FF;
 
     let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
@@ -345,7 +345,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
     let color = *(addr(0xa6cb4 + if not_focused { 0x4 } else { 0 }) as *mut u32);
     let raw_argb = color.to_be_bytes();
     let mut rgb = colorsys::Rgb::from([raw_argb[1], raw_argb[2], raw_argb[3]]);
-    
+
     let unit = *((ebp - 0x80) as *mut u32);
 
     rgb.adjust_hue(unit as f64 * 25.0);
@@ -354,16 +354,19 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
 
     if PTC::is_playing() {
         if rect[0] <= LAST_PLAYHEAD_POS {
-            
             // TODO: clean up this logic
             let flash_strength = if not_focused { 0.5 } else { 0.95 };
             if rect[2] >= LAST_PLAYHEAD_POS {
+                let get_event_value: unsafe extern "cdecl" fn(
+                    pos_x: i32,
+                    unit_no: i32,
+                    ev_type: i32,
+                ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
-                let get_event_value: unsafe extern "cdecl" fn(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 =
-                std::mem::transmute(addr(0x8f80) as *const ());
-
-                let volume: f32 = (get_event_value)(LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
-                let velocity: f32 = (get_event_value)(LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
+                let volume: f32 =
+                    (get_event_value)(LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
+                let velocity: f32 =
+                    (get_event_value)(LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
 
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);
@@ -373,7 +376,12 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
                 rgb.set_green(rgb.green() + (255.0 - rgb.green()) * mix);
                 rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
 
-                let fade_color: [u8; 4] = if not_focused { 0xff200040u32 } else { 0xff400070 }.to_be_bytes();
+                let fade_color: [u8; 4] = if not_focused {
+                    0xff200040u32
+                } else {
+                    0xff400070
+                }
+                .to_be_bytes();
                 let mix = 1.0 - (factor as f64) * 0.8;
                 rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
                 rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
@@ -382,8 +390,11 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
                 let fade_size = *PTC::get_measure_width() as i32 / 4;
                 let fade_pt = LAST_PLAYHEAD_POS - fade_size;
 
-                let get_event_value: unsafe extern "cdecl" fn(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 =
-                std::mem::transmute(addr(0x8f80) as *const ());
+                let get_event_value: unsafe extern "cdecl" fn(
+                    pos_x: i32,
+                    unit_no: i32,
+                    ev_type: i32,
+                ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
                 let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 128.0;
                 let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 128.0;
@@ -400,17 +411,30 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
                     rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
                 }
 
-                let fade_color: [u8; 4] = if not_focused { 0xff200040u32 } else { 0xff400070 }.to_be_bytes();
+                let fade_color: [u8; 4] = if not_focused {
+                    0xff200040u32
+                } else {
+                    0xff400070
+                }
+                .to_be_bytes();
                 let mix = 1.0 - (factor as f64) * 0.8;
                 rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
                 rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
                 rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
             }
         } else {
-            let fade_color: [u8; 4] = if not_focused { 0xff200040u32 } else { 0xff400070 }.to_be_bytes();
+            let fade_color: [u8; 4] = if not_focused {
+                0xff200040u32
+            } else {
+                0xff400070
+            }
+            .to_be_bytes();
 
-            let get_event_value: unsafe extern "cdecl" fn(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 =
-            std::mem::transmute(addr(0x8f80) as *const ());
+            let get_event_value: unsafe extern "cdecl" fn(
+                pos_x: i32,
+                unit_no: i32,
+                ev_type: i32,
+            ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
             let volume: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 128.0;
             let velocity: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 128.0;
@@ -422,10 +446,9 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
             rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
             rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
             rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
-
         }
     }
-    
+
     let rgb_arr: [u8; 3] = rgb.into();
 
     let color = u32::from_be_bytes([0, rgb_arr[0], rgb_arr[1], rgb_arr[2]]);
@@ -437,14 +460,22 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(rect: *const libc::c_i
     (draw_rect)(rect.as_ptr(), color);
 
     // main
-    (draw_rect)([rect[0] - 1, rect[1] - 1, rect[0], rect[3] + 1].as_ptr(), color);
-    (draw_rect)([rect[0] - 2, rect[1] - 3, rect[0] - 1, rect[3] + 3].as_ptr(), color);
-    
+    (draw_rect)(
+        [rect[0] - 1, rect[1] - 1, rect[0], rect[3] + 1].as_ptr(),
+        color,
+    );
+    (draw_rect)(
+        [rect[0] - 2, rect[1] - 3, rect[0] - 1, rect[3] + 3].as_ptr(),
+        color,
+    );
+
     // right edge
     (draw_rect)([rect[2], rect[1], rect[2] + 1, rect[3]].as_ptr(), color);
-    (draw_rect)([rect[2] + 1, rect[1] + 1, rect[2] + 2, rect[3] - 1].as_ptr(), color);
+    (draw_rect)(
+        [rect[2] + 1, rect[1] + 1, rect[2] + 2, rect[3] - 1].as_ptr(),
+        color,
+    );
 
-    
     // let get_event_value: unsafe extern "cdecl" fn(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 =
     // std::mem::transmute(addr(0x8f80) as *const ());
     // for x in 0..600 {
@@ -480,7 +511,6 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     // println!("draw_unitkb_top called");
 
     if PTC::is_playing() {
-
         {
             let smooth = winuser::GetMenuState(
                 winuser::GetMenu(*PTC::get_hwnd()),
@@ -509,7 +539,7 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
                 * *PTC::get_measure_width() as f32)
                 / (PTC::get_beat_clock() as f32))
                 / 22050.0) as i32;
-            
+
             LAST_SCROLL = des_scroll;
 
             if smooth {
@@ -517,7 +547,8 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
                 // des_scroll -= (view_rect[2] - view_rect[0]) / 2;
                 des_scroll -= (*PTC::get_measure_width() * 4) as i32;
             } else {
-                des_scroll = des_scroll / (*PTC::get_measure_width() * 4) as i32 * (*PTC::get_measure_width() * 4) as i32;
+                des_scroll = des_scroll / (*PTC::get_measure_width() * 4) as i32
+                    * (*PTC::get_measure_width() * 4) as i32;
             }
 
             let old_scroll = *PTC::get_scroll();
@@ -528,7 +559,8 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
         /*if play_pos != LAST_PLAY_POS {
             LAST_PLAY_POS_TIME = Some(Instant::now());
             LAST_PLAY_POS = play_pos;
-        } else */if let Some(i) = LAST_PLAY_POS_TIME {
+        } else */
+        if let Some(i) = LAST_PLAY_POS_TIME {
             play_pos += (44100.0
                 * Instant::now()
                     .saturating_duration_since(i)
@@ -560,10 +592,10 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
         //     0,
         // );
         winuser::RedrawWindow(
-            *PTC::get_hwnd(), 
-            0 as *const _, 
-            0 as *mut _, 
-            winuser::RDW_INTERNALPAINT
+            *PTC::get_hwnd(),
+            0 as *const _,
+            0 as *mut _,
+            winuser::RDW_INTERNALPAINT,
         );
     }
 
@@ -739,7 +771,8 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
 
                             // call ptCollage.exe+87A0
                             let bytes = i32::to_le_bytes(0x87a0 - (0x16625 + 0x5));
-                            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+                            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) =
+                                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
                             VirtualProtect(
                                 crate::ptc::addr(0x16625) as *mut libc::c_void,
@@ -760,7 +793,8 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
 
                             // call ptCollage.exe+9f80
                             let bytes = i32::to_le_bytes(0x9f80 - (0x166c0 + 0x5));
-                            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+                            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) =
+                                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
                             VirtualProtect(
                                 crate::ptc::addr(0x166c0) as *mut libc::c_void,
@@ -781,7 +815,8 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
 
                             // call ptCollage.exe+1c0e0
                             let bytes = i32::to_le_bytes(0x1c0e0 - (0x1469f + 0x5));
-                            *(crate::ptc::addr(0x1469f) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+                            *(crate::ptc::addr(0x1469f) as *mut [u8; 5]) =
+                                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
                             VirtualProtect(
                                 crate::ptc::addr(0x1469f) as *mut libc::c_void,
@@ -789,7 +824,6 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
                                 lpfl_old_protect_1,
                                 &mut lpfl_old_protect_1,
                             );
-                            
 
                             // (enable note left edge)
                             let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
@@ -864,9 +898,12 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
 
                             let target_addr = PTC::get_hook_draw_unitkb_bg() as *const () as usize;
                             // println!("target_addr = {}", target_addr);
-                            let bytes = i32::to_le_bytes((target_addr as i64 - (addr(0x16625) + 0x5) as i64) as i32);
+                            let bytes = i32::to_le_bytes(
+                                (target_addr as i64 - (addr(0x16625) + 0x5) as i64) as i32,
+                            );
                             // println!("bytes = {:?}", bytes);
-                            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+                            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) =
+                                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
                             VirtualProtect(
                                 crate::ptc::addr(0x16625) as *mut libc::c_void,
@@ -886,8 +923,11 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
                             );
 
                             let target_addr = PTC::get_hook_draw_unitkb_top() as *const () as usize;
-                            let bytes = i32::to_le_bytes((target_addr as i64 - (addr(0x166c0) + 0x5) as i64) as i32);
-                            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+                            let bytes = i32::to_le_bytes(
+                                (target_addr as i64 - (addr(0x166c0) + 0x5) as i64) as i32,
+                            );
+                            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) =
+                                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
                             VirtualProtect(
                                 crate::ptc::addr(0x166c0) as *mut libc::c_void,
@@ -907,9 +947,13 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
                             );
 
                             // call ptCollage.exe+1c0e0
-                            let target_addr = PTC::get_hook_draw_unit_note_rect() as *const () as usize;
-                            let bytes = i32::to_le_bytes((target_addr as i64 - (addr(0x1469f) + 0x5) as i64) as i32);
-                            *(crate::ptc::addr(0x1469f) as *mut [u8; 5]) = [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
+                            let target_addr =
+                                PTC::get_hook_draw_unit_note_rect() as *const () as usize;
+                            let bytes = i32::to_le_bytes(
+                                (target_addr as i64 - (addr(0x1469f) + 0x5) as i64) as i32,
+                            );
+                            *(crate::ptc::addr(0x1469f) as *mut [u8; 5]) =
+                                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
 
                             VirtualProtect(
                                 crate::ptc::addr(0x1469f) as *mut libc::c_void,
@@ -1006,7 +1050,9 @@ unsafe extern "system" fn fill_about_dialog(
         winuser::SetDlgItemTextA(hwnd, 0x3f6, msg_1.as_ptr() as *const i8);
         let msg_2: Vec<u8> = "PieKing1215\0".bytes().collect();
         winuser::SetDlgItemTextA(hwnd, 0x43a, msg_2.as_ptr() as *const i8);
-        let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown")).bytes().collect();
+        let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown"))
+            .bytes()
+            .collect();
         winuser::SetDlgItemTextA(hwnd, 0x40c, msg_3.as_ptr() as *const i8);
         let msg_4: Vec<u8> = "alpha test\0".bytes().collect();
         winuser::SetDlgItemTextA(hwnd, 0x3ea, msg_4.as_ptr() as *const i8);
@@ -1039,8 +1085,7 @@ unsafe extern "system" fn fill_about_dialog(
 fn frame_thread<PTC: PTCVersion>(_base: LPVOID) -> anyhow::Result<()> {
     unsafe {
         loop {
-            if PTC::is_playing()
-            {
+            if PTC::is_playing() {
                 // let smooth = winuser::GetMenuState(
                 //     winuser::GetMenu(*PTC::get_hwnd()),
                 //     M_SMOOTH_SCROLL_ID.try_into().unwrap(),
@@ -1068,7 +1113,7 @@ fn frame_thread<PTC: PTCVersion>(_base: LPVOID) -> anyhow::Result<()> {
                 //     * *PTC::get_measure_width() as f32)
                 //     / (PTC::get_beat_clock() as f32))
                 //     / 22050.0) as i32;
-                
+
                 // if smooth {
                 //     // let view_rect = PTC::get_unit_rect();
                 //     // des_scroll -= (view_rect[2] - view_rect[0]) / 2;

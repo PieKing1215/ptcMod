@@ -13,9 +13,9 @@ use winapi::{
 #[cfg(not(target_os = "windows"))]
 compile_error!("this is extremely windows dependent");
 
+mod patch;
 mod ptc;
 pub mod runtime;
-mod patch;
 
 fn attach() -> anyhow::Result<()> {
     unsafe {

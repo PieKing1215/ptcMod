@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use path_absolutize::Absolutize;
 use process_memory::{Pid, ProcessHandle, TryIntoProcessHandle};
-use sysinfo::{ProcessExt, System, SystemExt, PidExt};
+use sysinfo::{PidExt, ProcessExt, System, SystemExt};
 
 mod inject;
 
@@ -22,7 +22,11 @@ fn main() {
         // target/i686-pc-windows-gnu/debug/build/ptc-mod-xxxxxxxx/out/
         // to
         // target/i686-pc-windows-gnu/debug/ptc_mod.dll
-        let p = p.parent().and_then(Path::parent).and_then(Path::parent).map(|p| p.clone().to_path_buf());
+        let p = p
+            .parent()
+            .and_then(Path::parent)
+            .and_then(Path::parent)
+            .map(|p| p.clone().to_path_buf());
         if let Some(mut p) = p {
             p.push("ptc_mod.dll");
             try_paths.push(p);
@@ -32,13 +36,12 @@ fn main() {
     if let Some(handle) = get_ptc_handle() {
         for path in try_paths {
             if path.exists() {
-                let path = path.absolutize().map_or(path.clone(), |abs| abs.to_path_buf());
+                let path = path
+                    .absolutize()
+                    .map_or(path.clone(), |abs| abs.to_path_buf());
                 println!("Attempting to inject ptc_mod.dll @ {:?}", path);
 
-                let res = inject::inject_dll(
-                    handle.0,
-                    path.as_path(),
-                );
+                let res = inject::inject_dll(handle.0, path.as_path());
 
                 if let Err(e) = res {
                     eprintln!("{:?}", e);
@@ -46,7 +49,9 @@ fn main() {
                     break;
                 }
             } else {
-                let path = path.absolutize().map_or(path.clone(), |abs| abs.to_path_buf());
+                let path = path
+                    .absolutize()
+                    .map_or(path.clone(), |abs| abs.to_path_buf());
                 println!("Missing ptc_mod.dll @ {:?}", path);
             }
         }
