@@ -132,14 +132,14 @@ impl PTCVersion for PTC0925 {
 
     fn get_hook_draw_unitkb_top() -> unsafe extern "stdcall" fn() {
         unsafe extern "stdcall" fn draw_unitkb_top() {
-            crate::runtime::draw_unitkb_top::<PTC0925>()
+            crate::runtime::draw_unitkb_top::<PTC0925>();
         }
         draw_unitkb_top
     }
 
     fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn() {
         unsafe extern "stdcall" fn draw_unitkb_bg() {
-            crate::runtime::draw_unitkb_bg::<PTC0925>()
+            crate::runtime::draw_unitkb_bg::<PTC0925>();
         }
         draw_unitkb_bg
     }
@@ -150,7 +150,7 @@ impl PTCVersion for PTC0925 {
             rect: *const libc::c_int,
             color: libc::c_uint,
         ) {
-            crate::runtime::draw_unit_note_rect::<PTC0925>(rect, color)
+            crate::runtime::draw_unit_note_rect::<PTC0925>(rect, color);
         }
         draw_unit_note_rect
     }

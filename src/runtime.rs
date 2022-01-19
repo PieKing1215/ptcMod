@@ -28,6 +28,7 @@ pub struct Runtime<PTC: PTCVersion + ?Sized> {
     _phantom: PhantomData<PTC>,
 }
 
+#[must_use]
 pub fn try_run_version(version: (u16, u16, u16, u16)) -> Option<anyhow::Result<()>> {
     match version {
         (0, 9, 2, 5) => Some(Runtime::<crate::ptc::v0925::PTC0925>::new().main()),
@@ -37,10 +38,12 @@ pub fn try_run_version(version: (u16, u16, u16, u16)) -> Option<anyhow::Result<(
 }
 
 impl<PTC: PTCVersion> Runtime<PTC> {
+    #[must_use]
     pub fn new() -> Self {
         Self { _phantom: PhantomData }
     }
 
+    #[allow(clippy::too_many_lines)] // TODO
     pub fn main(&mut self) -> anyhow::Result<()> {
         CombinedLogger::init(vec![TermLogger::new(
             LevelFilter::Debug,
@@ -63,7 +66,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             let hwnd = PTC::get_hwnd();
 
             let base: usize = GetModuleHandleA(
-                "ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr() as *const i8,
+                "ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr().cast::<i8>(),
             ) as usize;
 
             log::debug!("Base address (allocation address) = {}", base);
@@ -108,7 +111,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 h_menu,
                 winuser::MF_POPUP,
                 base as usize,
-                l_title.as_ptr() as *const i8,
+                l_title.as_ptr().cast::<i8>(),
             );
 
             let l_title: Vec<u8> = "Smooth Scroll\0".bytes().collect();
@@ -116,7 +119,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 base,
                 winuser::MF_CHECKED,
                 M_SMOOTH_SCROLL_ID,
-                l_title.as_ptr() as *const i8,
+                l_title.as_ptr().cast::<i8>(),
             );
 
             let l_title: Vec<u8> = "FPS Unlock\0".bytes().collect();
@@ -124,7 +127,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 base,
                 winuser::MF_CHECKED,
                 M_FPS_UNLOCK,
-                l_title.as_ptr() as *const i8,
+                l_title.as_ptr().cast::<i8>(),
             );
 
             winuser::CheckMenuItem(
@@ -138,7 +141,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 base,
                 winuser::MF_CHECKED,
                 M_FRAME_HOOK,
-                l_title.as_ptr() as *const i8,
+                l_title.as_ptr().cast::<i8>(),
             );
 
             winuser::CheckMenuItem(
@@ -148,10 +151,10 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             );
 
             let l_title: Vec<u8> = "About\0".bytes().collect();
-            winuser::AppendMenuA(base, 0, M_ABOUT_ID, l_title.as_ptr() as *const i8);
+            winuser::AppendMenuA(base, 0, M_ABOUT_ID, l_title.as_ptr().cast::<i8>());
 
             let l_title: Vec<u8> = "Uninject\0".bytes().collect();
-            winuser::AppendMenuA(base, 0, M_UNINJECT_ID, l_title.as_ptr() as *const i8);
+            winuser::AppendMenuA(base, 0, M_UNINJECT_ID, l_title.as_ptr().cast::<i8>());
 
             winuser::DrawMenuBar(*hwnd);
 
@@ -340,6 +343,7 @@ static mut LAST_PLAYHEAD_POS: i32 = 0;
 
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
 //      which can be used to get the unit and focus state (which could be used to get the original color anyway)
+#[allow(clippy::too_many_lines)] // TODO
 pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     rect: *const libc::c_int,
     ebp: libc::c_uint,
@@ -383,12 +387,12 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
 
                 let fade_color: [u8; 4] = if not_focused {
-                    0xff200040u32
+                    0xff200040_u32
                 } else {
                     0xff400070
                 }
                 .to_be_bytes();
-                let mix = 1.0 - (factor as f64) * 0.8;
+                let mix = 1.0 - factor as f64 * 0.8;
                 rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
                 rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
                 rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
@@ -418,7 +422,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 }
 
                 let fade_color: [u8; 4] = if not_focused {
-                    0xff200040u32
+                    0xff200040_u32
                 } else {
                     0xff400070
                 }
@@ -430,7 +434,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
             }
         } else {
             let fade_color: [u8; 4] = if not_focused {
-                0xff200040u32
+                0xff200040_u32
             } else {
                 0xff400070
             }
@@ -587,6 +591,7 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     (fun_00009f80)();
 }
 
+#[allow(clippy::too_many_lines)] // TODO
 pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param: isize) -> isize {
     if code < 0 {
         winuser::CallNextHookEx(std::ptr::null_mut(), code, w_param, l_param)
@@ -603,7 +608,7 @@ pub(crate) unsafe fn hook_ex<PTC: PTCVersion>(code: i32, w_param: usize, l_param
                         let l_template: Vec<u8> = "DLG_ABOUT\0".bytes().collect();
                         winuser::DialogBoxParamA(
                             *PTC::get_hinstance(),
-                            l_template.as_ptr() as *const i8,
+                            l_template.as_ptr().cast::<i8>(),
                             msg.hwnd,
                             Some(fill_about_dialog),
                             0,
@@ -1031,15 +1036,15 @@ unsafe extern "system" fn fill_about_dialog(
 ) -> isize {
     if msg == winuser::WM_INITDIALOG {
         let msg_1: Vec<u8> = "PTC Mod\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x3f6, msg_1.as_ptr() as *const i8);
+        winuser::SetDlgItemTextA(hwnd, 0x3f6, msg_1.as_ptr().cast::<i8>());
         let msg_2: Vec<u8> = "PieKing1215\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x43a, msg_2.as_ptr() as *const i8);
+        winuser::SetDlgItemTextA(hwnd, 0x43a, msg_2.as_ptr().cast::<i8>());
         let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown"))
             .bytes()
             .collect();
-        winuser::SetDlgItemTextA(hwnd, 0x40c, msg_3.as_ptr() as *const i8);
+        winuser::SetDlgItemTextA(hwnd, 0x40c, msg_3.as_ptr().cast::<i8>());
         let msg_4: Vec<u8> = "alpha test\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x3ea, msg_4.as_ptr() as *const i8);
+        winuser::SetDlgItemTextA(hwnd, 0x3ea, msg_4.as_ptr().cast::<i8>());
 
         let fn_1: unsafe extern "cdecl" fn(param_1: HWND) =
             std::mem::transmute(addr(0x1e550) as *const ());

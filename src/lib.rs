@@ -1,3 +1,16 @@
+#![deny(clippy::all)]
+#![allow(clippy::cargo)]
+#![warn(clippy::pedantic)]
+
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![allow(clippy::unreadable_literal)]
+#![allow(clippy::cast_sign_loss)]
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+#![allow(clippy::cast_lossless)]
+
 use std::convert::TryInto;
 
 use winapi::{
@@ -17,6 +30,7 @@ mod patch;
 mod ptc;
 pub mod runtime;
 
+#[allow(clippy::too_many_lines)] // TODO
 fn attach() -> anyhow::Result<()> {
     unsafe {
         // this makes stdout work (eg println!)
@@ -27,7 +41,7 @@ fn attach() -> anyhow::Result<()> {
         // need to get ptc version without depending on memory addresses since addresses change on different versions
         // unfortunately the code to get exe version with winapi is terrible
 
-        let mut lptstr_filename = [0i8; 260];
+        let mut lptstr_filename = [0_i8; 260];
         lptstr_filename[0] = '\0' as i8;
         GetModuleFileNameA(
             std::ptr::null_mut(),
@@ -45,14 +59,14 @@ fn attach() -> anyhow::Result<()> {
                 lptstr_filename.as_ptr(),
                 dw_handle,
                 dw_size,
-                buf.as_mut_ptr() as *mut _,
+                buf.as_mut_ptr().cast(),
             ) > 0
             {
                 let mut pu_len = 0;
                 let mut lplp_buffer: *mut libc::c_void = std::ptr::null_mut();
                 if VerQueryValueA(
-                    buf.as_mut_ptr() as *mut _,
-                    "\\\0".bytes().collect::<Vec<u8>>().as_ptr() as *const i8,
+                    buf.as_mut_ptr().cast(),
+                    "\\\0".bytes().collect::<Vec<u8>>().as_ptr().cast::<i8>(),
                     &mut lplp_buffer,
                     &mut pu_len,
                 ) > 0
@@ -61,32 +75,32 @@ fn attach() -> anyhow::Result<()> {
                         lplp_buffer as *const u16,
                         pu_len as usize / std::mem::size_of::<u16>(),
                     );
-                    let check = ((v[1] as u32) << 16) | (v[0] as u32 & 0xffff);
+                    let check = (u32::from(v[1]) << 16) | (u32::from(v[0]) & 0xffff);
 
                     // https://docs.microsoft.com/en-us/windows/win32/api/verrsrc/ns-verrsrc-vs_fixedfileinfo#members
                     if check == 0xFEEF04BD {
                         // run the mod
                         if let Some(res) = runtime::try_run_version((v[5], v[4], v[7], v[6])) {
                             return res;
-                        } else {
-                            println!(
-                                "Unsupported PTC version: {}.{}.{}.{}\0",
-                                v[5], v[4], v[7], v[6]
-                            );
-                            let l_msg: Vec<u16> = format!(
-                                "Unsupported PTC version: {}.{}.{}.{}\0",
-                                v[5], v[4], v[7], v[6]
-                            )
-                            .encode_utf16()
-                            .collect();
-                            let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-                            winuser::MessageBoxW(
-                                std::ptr::null_mut(),
-                                l_msg.as_ptr(),
-                                l_title.as_ptr(),
-                                winuser::MB_OK | winuser::MB_ICONERROR,
-                            );
                         }
+
+                        println!(
+                            "Unsupported PTC version: {}.{}.{}.{}\0",
+                            v[5], v[4], v[7], v[6]
+                        );
+                        let l_msg: Vec<u16> = format!(
+                            "Unsupported PTC version: {}.{}.{}.{}\0",
+                            v[5], v[4], v[7], v[6]
+                        )
+                        .encode_utf16()
+                        .collect();
+                        let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
+                        winuser::MessageBoxW(
+                            std::ptr::null_mut(),
+                            l_msg.as_ptr(),
+                            l_title.as_ptr(),
+                            winuser::MB_OK | winuser::MB_ICONERROR,
+                        );
                     } else {
                         println!("Failed to fetch version, unsafe to continue: check");
                         let l_msg: Vec<u16> =
@@ -148,6 +162,7 @@ fn attach() -> anyhow::Result<()> {
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn detach() -> anyhow::Result<()> {
     println!("detach");
 
@@ -211,7 +226,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
         Ok(Ok(())) => {}
     }
 
-    FreeLibraryAndExitThread(base as _, 1);
+    FreeLibraryAndExitThread(base.cast(), 1);
     unreachable!()
 }
 
@@ -228,7 +243,7 @@ pub extern "stdcall" fn DllMain(
                 std::ptr::null_mut(),
                 0,
                 Some(attach_wrapper),
-                hinst_dll as _,
+                hinst_dll.cast(),
                 0,
                 std::ptr::null_mut(),
             );
