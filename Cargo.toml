@@ -2,6 +2,7 @@
 name = "ptc-mod"
 version = "0.1.0"
 edition = "2021"
+build = "src/build.rs"
 
 [dependencies]
 process-memory = "0.4"
