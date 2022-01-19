@@ -16,6 +16,9 @@ use winapi::{
     },
 };
 
+// TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
+const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
+
 use crate::ptc::{PTCVersion, addr};
 
 const M_SMOOTH_SCROLL_ID: usize = 1001;
@@ -56,7 +59,8 @@ impl<PTC: PTCVersion> Runtime<PTC> {
         .unwrap();
 
         let pid = unsafe { winapi::um::processthreadsapi::GetProcessId(winapi::um::processthreadsapi::GetCurrentProcess()) };
-        log::info!("PTC Mod v0.1.0 starting..."); // TODO: hardcoded version
+        log::info!("PTC Mod starting...");
+        log::info!("mod version = {}", VERSION.unwrap_or("unknown"));
         log::info!("PID = {}", pid);
 
         unsafe {
@@ -72,12 +76,13 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             log::info!("ptc version = {}.{}.{}.{}", v1, v2, v3, v4);
 
             let msg = format!(
-                "Injected!\nPID = {}\nptc version = {}.{}.{}.{}\nmod version = 0.1.0\0", // TODO: hardcoded version
+                "Injected!\nPID = {}\nptc version = {}.{}.{}.{}\nmod version = {}\0",
                 pid,
                 v1,
                 v2,
                 v3,
                 v4,
+                VERSION.unwrap_or("unknown"),
             );
             let l_msg: Vec<u16> = 
             msg.encode_utf16()
@@ -1001,7 +1006,7 @@ unsafe extern "system" fn fill_about_dialog(
         winuser::SetDlgItemTextA(hwnd, 0x3f6, msg_1.as_ptr() as *const i8);
         let msg_2: Vec<u8> = "PieKing1215\0".bytes().collect();
         winuser::SetDlgItemTextA(hwnd, 0x43a, msg_2.as_ptr() as *const i8);
-        let msg_3: Vec<u8> = "version.0.1.0\0".bytes().collect(); // TODO: hardcoded
+        let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown")).bytes().collect();
         winuser::SetDlgItemTextA(hwnd, 0x40c, msg_3.as_ptr() as *const i8);
         let msg_4: Vec<u8> = "alpha test\0".bytes().collect();
         winuser::SetDlgItemTextA(hwnd, 0x3ea, msg_4.as_ptr() as *const i8);
