@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CheatTable CheatEngineTableVersion="29">
+  <CheatEntries>
+    <CheatEntry>
+      <ID>0</ID>
+      <Description>"volume"</Description>
+      <LastState Value="0.1666666716" RealAddress="003A00E0"/>
+      <VariableType>Float</VariableType>
+      <Address>ptCollage.exe+C00E0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>1</ID>
+      <Description>"tab"</Description>
+      <LastState Value="1" RealAddress="003A0210"/>
+      <VariableType>Byte</VariableType>
+      <Address>ptCollage.exe+C0210</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>2</ID>
+      <Description>"loop"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>027818A3</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>3</ID>
+      <Description>"mute"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>027818A2</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>4</ID>
+      <Description>"player flags"</Description>
+      <LastState Value="0" RealAddress="00386B9C"/>
+      <VariableType>Byte</VariableType>
+      <Address>ptCollage.exe+A6B9C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>5</ID>
+      <Description>"project flags"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>00DD6BF5</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>6</ID>
+      <Description>"effector flags"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>00DD6A1D</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>7</ID>
+      <Description>"copy option flags"</Description>
+      <VariableType>Byte</VariableType>
+      <Address>00DD6999</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>8</ID>
+      <Description>"play button state"</Description>
+      <LastState Value="0" RealAddress="00386B98"/>
+      <VariableType>Byte</VariableType>
+      <Address>ptCollage.exe+A6B98</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>43</ID>
+      <Description>"playing"</Description>
+      <LastState Value="0" RealAddress="06352D54"/>
+      <VariableType>Byte</VariableType>
+      <Address>"ptCollage.exe"+000BE028</Address>
+      <Offsets>
+        <Offset>94</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>10</ID>
+      <Description>"No description"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>0x00dd4434</Address>
+      <Offsets>
+        <Offset>28</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>45</ID>
+      <Description>"beat num"</Description>
+      <LastState Value="4" RealAddress="0A8EEF28"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"ptCollage.exe"+000BE020</Address>
+      <Offsets>
+        <Offset>18</Offset>
+        <Offset>C0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>46</ID>
+      <Description>"tempo"</Description>
+      <LastState Value="148" RealAddress="0A8EEF2C"/>
+      <VariableType>Float</VariableType>
+      <Address>"ptCollage.exe"+000BE020</Address>
+      <Offsets>
+        <Offset>1C</Offset>
+        <Offset>C0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>47</ID>
+      <Description>"beat clock"</Description>
+      <LastState Value="480" RealAddress="0A8EEF30"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"ptCollage.exe"+000BE020</Address>
+      <Offsets>
+        <Offset>20</Offset>
+        <Offset>C0</Offset>
+      </Offsets>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>14</ID>
+      <Description>"scroll"</Description>
+      <LastState Value="3523" RealAddress="003A02F8"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+C02F8</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>15</ID>
+      <Description>"measure width"</Description>
+      <LastState Value="96" RealAddress="0039FE3C"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+BFE3C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>16</ID>
+      <Description>"scroll measure"</Description>
+      <LastState Value="9" RealAddress="003A010C"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+C010C</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>17</ID>
+      <Description>"first scroll (?)"</Description>
+      <LastState Value="3296313344" RealAddress="00386BA8"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+a6ba8</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>18</ID>
+      <Description>"No description"</Description>
+      <LastState Value="3296313344" RealAddress="00386BB0"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+a6bb0</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>20</ID>
+      <Description>"pointerscan result"</Description>
+      <VariableType>4 Bytes</VariableType>
+      <Address>02FD6A84</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>21</ID>
+      <Description>"play position"</Description>
+      <LastState Value="654828" RealAddress="0A5EA8F0"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>"ptCollage.exe"+000BE020</Address>
+      <Offsets>
+        <Offset>70</Offset>
+      </Offsets>
+      <CheatEntries>
+        <CheatEntry>
+          <ID>30</ID>
+          <Description>"play start"</Description>
+          <LastState Value="0" RealAddress="0A5EA8F4"/>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"ptCollage.exe"+000BE020</Address>
+          <Offsets>
+            <Offset>74</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>33</ID>
+          <Description>"length"</Description>
+          <LastState Value="1144216" RealAddress="0A5EA8F8"/>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"ptCollage.exe"+000BE020</Address>
+          <Offsets>
+            <Offset>78</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>34</ID>
+          <Description>"length"</Description>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"ptCollage.exe"+000A4430</Address>
+          <Offsets>
+            <Offset>60</Offset>
+          </Offsets>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>32</ID>
+          <Description>"sample rate"</Description>
+          <LastState Value="44100" RealAddress="0A5EA8A0"/>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"ptCollage.exe"+000BE020</Address>
+          <Offsets>
+            <Offset>20</Offset>
+          </Offsets>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>31</ID>
+              <Description>"sample rate / 250"</Description>
+              <LastState Value="176" RealAddress="0A5EA8E8"/>
+              <VariableType>4 Bytes</VariableType>
+              <Address>"ptCollage.exe"+000BE020</Address>
+              <Offsets>
+                <Offset>68</Offset>
+              </Offsets>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+        <CheatEntry>
+          <ID>40</ID>
+          <Description>"buffer size"</Description>
+          <VariableType>4 Bytes</VariableType>
+          <Address>"ptCollage.exe"+000A4434</Address>
+          <Offsets>
+            <Offset>20</Offset>
+          </Offsets>
+          <CheatEntries>
+            <CheatEntry>
+              <ID>38</ID>
+              <Description>"buffer size in menu"</Description>
+              <LastState Value="0.1000000015" RealAddress="06352CD4"/>
+              <VariableType>Float</VariableType>
+              <Address>"ptCollage.exe"+BE028</Address>
+              <Offsets>
+                <Offset>14</Offset>
+              </Offsets>
+            </CheatEntry>
+          </CheatEntries>
+        </CheatEntry>
+      </CheatEntries>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>48</ID>
+      <Description>"fps"</Description>
+      <LastState Value="126" RealAddress="0039DDB8"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+BDDB8</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>49</ID>
+      <Description>"frame counter"</Description>
+      <LastState Value="42" RealAddress="0039DDB4"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+BDDB4</Address>
+    </CheatEntry>
+    <CheatEntry>
+      <ID>50</ID>
+      <Description>"last fps update"</Description>
+      <LastState Value="297715078" RealAddress="0039DDB0"/>
+      <VariableType>4 Bytes</VariableType>
+      <Address>ptCollage.exe+BDDB0</Address>
+    </CheatEntry>
+  </CheatEntries>
+  <UserdefinedSymbols/>
+</CheatTable>

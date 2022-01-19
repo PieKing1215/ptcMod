@@ -1,0 +1,22 @@
+[package]
+name = "pxtone-mod"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+# pxtone = "0.1"
+process-memory = "0.4"
+sysinfo = "0.20"
+winapi = { version = "^0.3", features = ["std", "everything"] }
+libc = { version = "^0.2", features = ["use_std", "extra_traits"] }
+getset = "^0.0"
+failure = "^0.1"
+log = "0.4.14"
+simplelog = "0.11.2"
+widestring = "0.5.1"
+anyhow = "1.0"
+colorsys = "0.6.5"
+
+[lib]
+name = "cheat"
+crate-type = ["dylib"]
