@@ -487,14 +487,14 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 pub(crate) unsafe fn draw_unitkb_bg<PTC: PTCVersion>() {
     // println!("draw_unitkb_bg called");
 
-    let mut play_pos = LAST_PLAY_POS;
-    if let Some(i) = LAST_PLAY_POS_TIME {
-        play_pos += (44100.0
-            * Instant::now()
-                .saturating_duration_since(i)
-                .as_secs_f32()
-                .clamp(0.0, 0.5)) as u32;
-    }
+    // let mut play_pos = LAST_PLAY_POS;
+    // if let Some(i) = LAST_PLAY_POS_TIME {
+    //     play_pos += (44100.0
+    //         * Instant::now()
+    //             .saturating_duration_since(i)
+    //             .as_secs_f32()
+    //             .clamp(0.0, 0.5)) as u32;
+    // }
 
     // let x = (play_pos as f32 / 10000.0).sin() * 50.0 + 200.0;
     // let y = (play_pos as f32 / 10000.0).cos() * 50.0 + 250.0;
@@ -551,30 +551,8 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
                     * (*PTC::get_measure_width() * 4) as i32;
             }
 
-            let old_scroll = *PTC::get_scroll();
             *PTC::get_scroll() = des_scroll.clamp(0, PTC::get_scroll_max());
         }
-
-        let mut play_pos = LAST_PLAY_POS;
-        /*if play_pos != LAST_PLAY_POS {
-            LAST_PLAY_POS_TIME = Some(Instant::now());
-            LAST_PLAY_POS = play_pos;
-        } else */
-        if let Some(i) = LAST_PLAY_POS_TIME {
-            play_pos += (44100.0
-                * Instant::now()
-                    .saturating_duration_since(i)
-                    .as_secs_f32()
-                    .clamp(0.0, 0.5)) as u32;
-        }
-        // *((0xdd6d70 + 0x14) as *mut i32) = (((msg.time as f32) / 500.0).sin() * 100.0 + 300.0) as i32;
-        let des_scroll = (((play_pos as f32
-            * *PTC::get_tempo()
-            * 4.0
-            // * *PTC::get_beat_num() as f32
-            * *PTC::get_measure_width() as f32)
-            / (PTC::get_beat_clock() as f32))
-            / 22050.0) as i32;
 
         let unit_rect = PTC::get_unit_rect();
 

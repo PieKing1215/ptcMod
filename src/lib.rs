@@ -1,4 +1,4 @@
-use std::{convert::TryInto, io::Write};
+use std::convert::TryInto;
 
 use winapi::{
     shared::minwindef::{DWORD, HINSTANCE, LPVOID},
@@ -34,7 +34,7 @@ fn attach() -> anyhow::Result<()> {
             lptstr_filename.as_mut_ptr(),
             lptstr_filename.len().try_into().unwrap(),
         );
-        let mut dw_handle: DWORD = std::mem::uninitialized();
+        let mut dw_handle: DWORD = 0;
         let dw_size = GetFileVersionInfoSizeA(lptstr_filename.as_ptr(), &mut dw_handle);
 
         if dw_size > 0 {
@@ -49,7 +49,7 @@ fn attach() -> anyhow::Result<()> {
             ) > 0
             {
                 let mut pu_len = 0;
-                let mut lplp_buffer: *mut libc::c_void = std::mem::uninitialized();
+                let mut lplp_buffer: *mut libc::c_void = std::ptr::null_mut();
                 if VerQueryValueA(
                     buf.as_mut_ptr() as *mut _,
                     "\\\0".bytes().collect::<Vec<u8>>().as_ptr() as *const i8,
