@@ -21,13 +21,14 @@ jobs:
         rustup target add i686-pc-windows-gnu
         rustup toolchain install stable-i686-pc-windows-gnu
     - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
-    - name: Build Release
       run: cargo build --release --verbose
+    - name: Run tests
+      run: cargo test --release --verbose
     - name: Zip
-      run: zip -j ptcMod.zip target/i686-pc-windows-gnu/debug/ptc-mod.exe target/i686-pc-windows-gnu/debug/ptc_mod.dll
+      uses: papeloto/action-zip@v1
+      with:
+        files: target/i686-pc-windows-gnu/debug/ptc-mod.exe target/i686-pc-windows-gnu/debug/ptc_mod.dll
+        dest: ptcMod.zip
     - name: Upload Artifact
       uses: actions/upload-artifact@v2
       with:
