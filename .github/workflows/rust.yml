@@ -16,6 +16,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Setup
+      run: |
+        rustup target add i686-pc-windows-gnu
+        rustup toolchain install stable-i686-pc-windows-gnu
     - name: Build
       run: cargo build --verbose
     - name: Run tests
