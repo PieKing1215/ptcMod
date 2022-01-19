@@ -12,9 +12,7 @@ fn main() {
     // basically if there's a ptc_mod.dll in the working directory, use it.
     // otherwise if running using cargo, look in the right target/ folder for it
 
-    let mut try_paths = vec![
-        PathBuf::from("./ptc_mod.dll"),
-    ];
+    let mut try_paths = vec![PathBuf::from("./ptc_mod.dll")];
     println!("{:?}", option_env!("OUT_DIR"));
 
     if let Some(p) = option_env!("OUT_DIR") {

@@ -37,9 +37,13 @@ pub trait PTCVersion {
 
 pub fn addr(relative: usize) -> usize {
     unsafe {
-        let base =
-            GetModuleHandleA("ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr().cast::<i8>())
-                as usize;
+        let base = GetModuleHandleA(
+            "ptCollage.exe\0"
+                .bytes()
+                .collect::<Vec<u8>>()
+                .as_ptr()
+                .cast::<i8>(),
+        ) as usize;
         base + relative
     }
 }

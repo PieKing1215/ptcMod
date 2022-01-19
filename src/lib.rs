@@ -1,7 +1,6 @@
 #![deny(clippy::all)]
 #![allow(clippy::cargo)]
 #![warn(clippy::pedantic)]
-
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::missing_panics_doc)]
 #![allow(clippy::unreadable_literal)]

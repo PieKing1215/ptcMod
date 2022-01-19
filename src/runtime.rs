@@ -66,7 +66,11 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             let hwnd = PTC::get_hwnd();
 
             let base: usize = GetModuleHandleA(
-                "ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr().cast::<i8>(),
+                "ptCollage.exe\0"
+                    .bytes()
+                    .collect::<Vec<u8>>()
+                    .as_ptr()
+                    .cast::<i8>(),
             ) as usize;
 
             log::debug!("Base address (allocation address) = {}", base);
@@ -1113,11 +1117,7 @@ fn frame_thread<PTC: PTCVersion>(_base: LPVOID) -> anyhow::Result<()> {
 
                 // let old_scroll = *PTC::get_scroll();
                 // *PTC::get_scroll() += des_scroll - old_scroll;
-                winuser::InvalidateRect(
-                    *PTC::get_hwnd(),
-                    std::ptr::null(),
-                    0,
-                );
+                winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
                 // winuser::UpdateWindow(*PTC::get_hwnd());
             }
 
