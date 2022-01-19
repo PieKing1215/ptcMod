@@ -1,0 +1,2 @@
+[toolchain]
+channel = "stable-i686-pc-windows-gnu"
