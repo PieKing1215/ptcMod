@@ -28,7 +28,6 @@ pub(crate) fn next_id() -> u16 {
 
 lazy_static::lazy_static! {
     static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
-    static ref M_FPS_UNLOCK: u16 = next_id();
     static ref M_FRAME_HOOK: u16 = next_id();
     static ref M_ABOUT_ID: u16 = next_id();
     static ref M_UNINJECT_ID: u16 = next_id();
@@ -176,20 +175,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 l_title.as_ptr().cast::<i8>(),
             );
 
-            let l_title: Vec<u8> = "FPS Unlock\0".bytes().collect();
-            winuser::AppendMenuA(
-                base,
-                winuser::MF_CHECKED,
-                *M_FPS_UNLOCK as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                base,
-                *M_FPS_UNLOCK as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
             let l_title: Vec<u8> = "dbg frame hook\0".bytes().collect();
             winuser::AppendMenuA(
                 base,
@@ -204,15 +189,15 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
             );
 
+            for feat in &mut self.features {
+                feat.init(base);
+            }
+
             let l_title: Vec<u8> = "About\0".bytes().collect();
             winuser::AppendMenuA(base, 0, *M_ABOUT_ID as usize, l_title.as_ptr().cast::<i8>());
 
             let l_title: Vec<u8> = "Uninject\0".bytes().collect();
             winuser::AppendMenuA(base, 0, *M_UNINJECT_ID as usize, l_title.as_ptr().cast::<i8>());
-
-            for feat in &mut self.features {
-                feat.init();
-            }
 
             winuser::DrawMenuBar(*hwnd);
 
@@ -364,103 +349,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                             winuser::GetMenu(msg.hwnd),
                             (*M_SMOOTH_SCROLL_ID).try_into().unwrap(),
                             winuser::MF_BYCOMMAND | winuser::MF_CHECKED,
-                        );
-                    }
-                } else if low == *M_FPS_UNLOCK {
-                    if winuser::GetMenuState(
-                        winuser::GetMenu(msg.hwnd),
-                        (*M_FPS_UNLOCK).try_into().unwrap(),
-                        winuser::MF_BYCOMMAND,
-                    ) & winuser::MF_CHECKED
-                        > 0
-                    {
-                        winuser::CheckMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            (*M_FPS_UNLOCK).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-                        );
-
-                        let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_1,
-                        );
-                        *(crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut u8) = 0x01;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            lpfl_old_protect_1,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        let mut lpfl_old_protect_2: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00D46808 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_2,
-                        );
-                        *(crate::ptc::addr(0x00D46808 - 0xd30000) as *mut u8) = 0x72;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00D46808 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            lpfl_old_protect_2,
-                            &mut lpfl_old_protect_2,
-                        );
-
-                        let mut lpfl_old_protect_3: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00D46809 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_3,
-                        );
-                        *(crate::ptc::addr(0x00D46809 - 0xd30000) as *mut u8) = 0xe8;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00D46809 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            lpfl_old_protect_3,
-                            &mut lpfl_old_protect_3,
-                        );
-                    } else {
-                        winuser::CheckMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            (*M_FPS_UNLOCK).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND | winuser::MF_CHECKED,
-                        );
-
-                        // let fps_patch_old = (*(0x00D467f3 as *mut u8), *(0x00D46808 as *mut u16));
-
-                        let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_1,
-                        );
-                        *(crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut u8) = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00d467f3 - 0xd30000) as *mut libc::c_void,
-                            0x1,
-                            lpfl_old_protect_1,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        let mut lpfl_old_protect_2: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00D46808 - 0xd30000) as *mut libc::c_void,
-                            0x2,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_2,
-                        );
-                        *(crate::ptc::addr(0x00D46808 - 0xd30000) as *mut u16) = 0x9090;
-                        VirtualProtect(
-                            crate::ptc::addr(0x00D46808 - 0xd30000) as *mut libc::c_void,
-                            0x2,
-                            lpfl_old_protect_2,
-                            &mut lpfl_old_protect_2,
                         );
                     }
                 } else if low == *M_FRAME_HOOK {

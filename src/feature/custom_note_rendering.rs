@@ -1,4 +1,4 @@
-use winapi::um::winuser;
+use winapi::{um::winuser, shared::windef::HMENU};
 
 use crate::{ptc::{PTCVersion, addr}, patch::Patch, runtime::{next_id, menu_toggle}};
 
@@ -48,7 +48,7 @@ impl CustomNoteRendering {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
-    fn init(&mut self) {
+    fn init(&mut self, _menu: HMENU) {
         unsafe {
             let h_menu = winuser::GetMenu(*PTC::get_hwnd());
             let base = winuser::CreateMenu();

@@ -1,4 +1,4 @@
-use crate::{patch::Patch, feature::{Feature, custom_note_rendering::CustomNoteRendering}};
+use crate::{patch::Patch, feature::{Feature, custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock}};
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::patch::MultiPatch;
@@ -12,6 +12,7 @@ impl PTCVersion for PTC0925 {
     fn get_features() -> Vec<Box<dyn Feature<Self>>> {
         vec![
             Box::new(CustomNoteRendering::new::<Self>()),
+            Box::new(FPSUnlock::new::<Self>()),
         ]
     }
 
