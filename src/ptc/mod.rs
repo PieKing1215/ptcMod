@@ -6,7 +6,7 @@ use winapi::{
     um::libloaderapi::GetModuleHandleA,
 };
 
-use crate::{patch::MultiPatch, feature::Feature};
+use crate::{feature::Feature, patch::MultiPatch};
 
 pub trait PTCVersion {
     fn get_features() -> Vec<Box<dyn Feature<Self>>>;

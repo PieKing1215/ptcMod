@@ -1,7 +1,11 @@
 use colorsys::ColorTransform;
-use winapi::{um::winuser, shared::windef::HMENU};
+use winapi::{shared::windef::HMENU, um::winuser};
 
-use crate::{ptc::{PTCVersion, addr}, patch::Patch, runtime::{next_id, menu_toggle}};
+use crate::{
+    patch::Patch,
+    ptc::{addr, PTCVersion},
+    runtime::{menu_toggle, next_id},
+};
 
 use super::Feature;
 
@@ -14,32 +18,34 @@ pub struct CustomNoteRendering {
 }
 
 impl CustomNoteRendering {
-    pub fn new<PTC: PTCVersion>(draw_unit_note_rect_hook: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint)) -> Self {
+    pub fn new<PTC: PTCVersion>(
+        draw_unit_note_rect_hook: unsafe extern "cdecl" fn(
+            rect: *const libc::c_int,
+            color: libc::c_uint,
+        ),
+    ) -> Self {
         let old_bytes = i32::to_le_bytes(0x1c0e0 - (0x1469f + 0x5));
-        
+
         let new_bytes = i32::to_le_bytes(
             (draw_unit_note_rect_hook as *const () as i64 - (addr(0x1469f) + 0x5) as i64) as i32,
         );
 
-        let note_rect_hook_patch = Patch::new(0x1469f, 
+        let note_rect_hook_patch = Patch::new(
+            0x1469f,
             vec![0xe8, old_bytes[0], old_bytes[1], old_bytes[2], old_bytes[3]],
-            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]]).unwrap();
+            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]],
+        )
+        .unwrap();
 
-        let note_rect_push_ebp = Patch::new(0x1469a,
-            vec![0x52],
-            vec![0x55]).unwrap();
+        let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
 
-        let note_disable_left_edge = Patch::new(0x146b8,
-            vec![0x03],
-            vec![0x00]).unwrap();
+        let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
 
-        let note_disable_right_edge = Patch::new(0x146e9,
-            vec![0x03],
-            vec![0x00]).unwrap();
+        let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
 
         Self {
             note_draw_patch: vec![
-                note_rect_push_ebp, 
+                note_rect_push_ebp,
                 note_rect_hook_patch,
                 note_disable_left_edge,
                 note_disable_right_edge,
@@ -79,7 +85,11 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 
     fn cleanup(&mut self) {
         unsafe {
-            winuser::RemoveMenu(winuser::GetMenu(*PTC::get_hwnd()), 4, winuser::MF_BYPOSITION);
+            winuser::RemoveMenu(
+                winuser::GetMenu(*PTC::get_hwnd()),
+                4,
+                winuser::MF_BYPOSITION,
+            );
 
             for p in &self.note_draw_patch {
                 if let Err(e) = p.unapply() {
@@ -114,7 +124,6 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 
         false
     }
-    
 }
 
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
@@ -150,9 +159,13 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
                 let volume: f32 =
-                    (get_event_value)(crate::feature::scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
+                    (get_event_value)(crate::feature::scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5)
+                        as f32
+                        / 128.0;
                 let velocity: f32 =
-                    (get_event_value)(crate::feature::scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
+                    (get_event_value)(crate::feature::scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5)
+                        as f32
+                        / 128.0;
 
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);

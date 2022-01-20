@@ -2,7 +2,7 @@ pub mod custom_note_rendering;
 pub mod fps_unlock;
 pub mod scroll;
 
-use winapi::{um::winuser::MSG, shared::windef::HMENU};
+use winapi::{shared::windef::HMENU, um::winuser::MSG};
 
 use crate::ptc::PTCVersion;
 

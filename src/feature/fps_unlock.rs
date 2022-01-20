@@ -1,6 +1,10 @@
 use winapi::{shared::windef::HMENU, um::winuser};
 
-use crate::{patch::Patch, ptc::{PTCVersion, addr}, runtime::{next_id, menu_toggle}};
+use crate::{
+    patch::Patch,
+    ptc::{addr, PTCVersion},
+    runtime::{menu_toggle, next_id},
+};
 
 use super::Feature;
 
@@ -14,29 +18,18 @@ pub struct FPSUnlock {
 
 impl FPSUnlock {
     pub fn new<PTC: PTCVersion>() -> Self {
-
         // the original source is like
         // do {
         //     Sleep(1);
         // } while(not enough time passed);
 
         // push 1 -> push 0
-        let sleep_patch = Patch::new(0x167f3,
-            vec![0x01],
-            vec![0x00]).unwrap();
+        let sleep_patch = Patch::new(0x167f3, vec![0x01], vec![0x00]).unwrap();
 
         // jc (label) -> nop nop
-        let loop_patch = Patch::new(0x16808,
-            vec![0x72, 0xe8],
-            vec![0x90, 0x90],
-        ).unwrap();
+        let loop_patch = Patch::new(0x16808, vec![0x72, 0xe8], vec![0x90, 0x90]).unwrap();
 
-        Self {
-            patch: vec![
-                sleep_patch,
-                loop_patch,
-            ],
-        }
+        Self { patch: vec![sleep_patch, loop_patch] }
     }
 }
 

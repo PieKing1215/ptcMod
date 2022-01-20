@@ -122,5 +122,5 @@ impl PTCVersion for PTC09454 {
 
     fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn() {
         todo!()
-    }  
+    }
 }

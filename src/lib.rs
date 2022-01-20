@@ -25,10 +25,10 @@ use winapi::{
 #[cfg(not(target_os = "windows"))]
 compile_error!("this is extremely windows dependent");
 
+mod feature;
 mod patch;
 mod ptc;
 pub mod runtime;
-mod feature;
 
 #[allow(clippy::too_many_lines)] // TODO
 fn attach() -> anyhow::Result<()> {
@@ -172,7 +172,6 @@ fn detach() -> anyhow::Result<()> {
 unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
     match std::panic::catch_unwind(attach) {
         Err(err) => {
-
             let msg = match err.downcast_ref::<&'static str>() {
                 Some(s) => *s,
                 None => match err.downcast_ref::<String>() {

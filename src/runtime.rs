@@ -1,4 +1,4 @@
-use std::{convert::TryInto, marker::PhantomData, sync::mpsc::Sender, time::Instant, cell::Cell};
+use std::{cell::Cell, convert::TryInto, marker::PhantomData, sync::mpsc::Sender, time::Instant};
 
 use colorsys::ColorTransform;
 use log::LevelFilter;
@@ -14,7 +14,11 @@ use winapi::{
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
 const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
-use crate::{ptc::{addr, PTCVersion}, patch::Patch, feature::Feature};
+use crate::{
+    feature::Feature,
+    patch::Patch,
+    ptc::{addr, PTCVersion},
+};
 
 // system for assigning globally unique menu ids without hardcoded constants
 static mut MENU_ID_COUNTER: Cell<u16> = Cell::new(1000);
@@ -37,11 +41,8 @@ lazy_static::lazy_static! {
 pub(crate) fn menu_toggle(hwnd: HWND, id: impl Into<u32>) -> bool {
     let id = id.into();
     unsafe {
-        if winuser::GetMenuState(
-            winuser::GetMenu(hwnd),
-            id,
-            winuser::MF_BYCOMMAND,
-        ) & winuser::MF_CHECKED
+        if winuser::GetMenuState(winuser::GetMenu(hwnd), id, winuser::MF_BYCOMMAND)
+            & winuser::MF_CHECKED
             > 0
         {
             winuser::CheckMenuItem(
@@ -86,9 +87,7 @@ pub fn try_run_version(version: (u16, u16, u16, u16)) -> Option<anyhow::Result<(
 impl<PTC: PTCVersion> Runtime<PTC> {
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            features: PTC::get_features(),
-        }
+        Self { features: PTC::get_features() }
     }
 
     #[allow(clippy::too_many_lines)] // TODO
@@ -188,7 +187,12 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             winuser::AppendMenuA(base, 0, *M_ABOUT_ID as usize, l_title.as_ptr().cast::<i8>());
 
             let l_title: Vec<u8> = "Uninject\0".bytes().collect();
-            winuser::AppendMenuA(base, 0, *M_UNINJECT_ID as usize, l_title.as_ptr().cast::<i8>());
+            winuser::AppendMenuA(
+                base,
+                0,
+                *M_UNINJECT_ID as usize,
+                l_title.as_ptr().cast::<i8>(),
+            );
 
             winuser::DrawMenuBar(*hwnd);
 
@@ -233,7 +237,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     MsgType::WinMsg(msg) => {
                         self.on_win_msg(msg);
                     }
-                    _ => {},
+                    _ => {}
                 }
             }
 
@@ -299,7 +303,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
     #[allow(clippy::too_many_lines)] // TODO
     unsafe fn on_win_msg(&mut self, msg: winuser::MSG) {
-
         if self.features.iter_mut().any(|f| f.win_msg(&msg)) {
             return;
         }
@@ -309,7 +312,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
             let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
 
             if high == 0 {
-
                 // can't match against statics
                 if low == *M_ABOUT_ID {
                     let l_template: Vec<u8> = "DLG_ABOUT\0".bytes().collect();
@@ -494,7 +496,6 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     let fun_00009f80: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x9f80) as *const ());
     (fun_00009f80)();
 }
-
 
 unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> isize {
     if code >= 0 {

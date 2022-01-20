@@ -2,7 +2,11 @@ use std::time::Instant;
 
 use winapi::{shared::windef::HMENU, um::winuser};
 
-use crate::{patch::Patch, ptc::{PTCVersion, addr}, runtime::{next_id, menu_toggle}};
+use crate::{
+    patch::Patch,
+    ptc::{addr, PTCVersion},
+    runtime::{menu_toggle, next_id},
+};
 
 use super::Feature;
 
@@ -22,22 +26,20 @@ pub struct Scroll {
 
 impl Scroll {
     pub fn new<PTC: PTCVersion>(unit_clear_hook: unsafe extern "stdcall" fn()) -> Self {
-
         let old_bytes = i32::to_le_bytes(0x16440 - (0x165e8 + 0x5));
-        
+
         let new_bytes = i32::to_le_bytes(
             (unit_clear_hook as *const () as i64 - (addr(0x165e8) + 0x5) as i64) as i32,
         );
 
-        let clear_notes_hook_patch = Patch::new(0x165e8, 
+        let clear_notes_hook_patch = Patch::new(
+            0x165e8,
             vec![0xe8, old_bytes[0], old_bytes[1], old_bytes[2], old_bytes[3]],
-            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]]).unwrap();
+            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]],
+        )
+        .unwrap();
 
-        Self {
-            patch: vec![
-                clear_notes_hook_patch
-            ],
-        }
+        Self { patch: vec![clear_notes_hook_patch] }
     }
 }
 
@@ -138,7 +140,6 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
 }
 
 pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
-
     // println!("draw_unitkb_top called");
 
     if PTC::is_playing() {

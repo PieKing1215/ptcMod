@@ -32,7 +32,12 @@ impl Patch {
     pub unsafe fn apply(&self) -> anyhow::Result<()> {
         let mem = std::slice::from_raw_parts_mut(addr(self.addr) as *mut u8, self.old.len());
 
-        log::debug!("Patching @ {:#x} (apply). Expect {:x?} found {:x?}", self.addr, self.old, mem);
+        log::debug!(
+            "Patching @ {:#x} (apply). Expect {:x?} found {:x?}",
+            self.addr,
+            self.old,
+            mem
+        );
         if self.old == mem {
             let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
             VirtualProtect(
@@ -54,14 +59,24 @@ impl Patch {
             log::debug!("-> {:x?}", mem);
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Patch at {:#x} found wrong bytes for apply. Expected {:x?} found {:x?}", self.addr, self.old, mem))
+            Err(anyhow::anyhow!(
+                "Patch at {:#x} found wrong bytes for apply. Expected {:x?} found {:x?}",
+                self.addr,
+                self.old,
+                mem
+            ))
         }
     }
 
     pub unsafe fn unapply(&self) -> anyhow::Result<()> {
         let mem = std::slice::from_raw_parts_mut(addr(self.addr) as *mut u8, self.new.len());
 
-        log::debug!("Patching @ {:#x} (unapply). Expect {:x?} found {:x?}", self.addr, self.old, mem);
+        log::debug!(
+            "Patching @ {:#x} (unapply). Expect {:x?} found {:x?}",
+            self.addr,
+            self.old,
+            mem
+        );
         if self.new == mem {
             let mut lpfl_old_protect: winapi::shared::minwindef::DWORD = 0;
             VirtualProtect(
@@ -84,7 +99,12 @@ impl Patch {
 
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Patch at {:#x} found wrong bytes for unapply. Expected {:x?} found {:x?}", self.addr, self.new, mem))
+            Err(anyhow::anyhow!(
+                "Patch at {:#x} found wrong bytes for unapply. Expected {:x?} found {:x?}",
+                self.addr,
+                self.new,
+                mem
+            ))
         }
     }
 }
