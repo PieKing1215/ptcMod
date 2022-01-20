@@ -27,8 +27,7 @@ pub(crate) fn next_id() -> u16 {
 }
 
 lazy_static::lazy_static! {
-    static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
-    static ref M_FRAME_HOOK: u16 = next_id();
+    static ref M_PLAYHEAD_ID: u16 = next_id();
     static ref M_ABOUT_ID: u16 = next_id();
     static ref M_UNINJECT_ID: u16 = next_id();
 }
@@ -167,25 +166,17 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 l_title.as_ptr().cast::<i8>(),
             );
 
-            let l_title: Vec<u8> = "Smooth Scroll\0".bytes().collect();
+            let l_title: Vec<u8> = "Playhead\0".bytes().collect();
             winuser::AppendMenuA(
                 base,
                 winuser::MF_CHECKED,
-                *M_SMOOTH_SCROLL_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            let l_title: Vec<u8> = "dbg frame hook\0".bytes().collect();
-            winuser::AppendMenuA(
-                base,
-                winuser::MF_CHECKED,
-                *M_FRAME_HOOK as usize,
+                *M_PLAYHEAD_ID as usize,
                 l_title.as_ptr().cast::<i8>(),
             );
 
             winuser::CheckMenuItem(
                 base,
-                *M_FRAME_HOOK as u32,
+                *M_PLAYHEAD_ID as u32,
                 winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
             );
 
@@ -331,37 +322,17 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     );
                 } else if low == *M_UNINJECT_ID {
                     SENDER.as_mut().unwrap().send(MsgType::Uninject).unwrap();
-                } else if low == *M_SMOOTH_SCROLL_ID {
+                } else if low == *M_PLAYHEAD_ID {
                     if winuser::GetMenuState(
                         winuser::GetMenu(msg.hwnd),
-                        (*M_SMOOTH_SCROLL_ID).try_into().unwrap(),
+                        (*M_PLAYHEAD_ID).try_into().unwrap(),
                         winuser::MF_BYCOMMAND,
                     ) & winuser::MF_CHECKED
                         > 0
                     {
                         winuser::CheckMenuItem(
                             winuser::GetMenu(msg.hwnd),
-                            (*M_SMOOTH_SCROLL_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-                        );
-                    } else {
-                        winuser::CheckMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            (*M_SMOOTH_SCROLL_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND | winuser::MF_CHECKED,
-                        );
-                    }
-                } else if low == *M_FRAME_HOOK {
-                    if winuser::GetMenuState(
-                        winuser::GetMenu(msg.hwnd),
-                        (*M_FRAME_HOOK).try_into().unwrap(),
-                        winuser::MF_BYCOMMAND,
-                    ) & winuser::MF_CHECKED
-                        > 0
-                    {
-                        winuser::CheckMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            (*M_FRAME_HOOK).try_into().unwrap(),
+                            (*M_PLAYHEAD_ID).try_into().unwrap(),
                             winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
                         );
 
@@ -409,7 +380,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     } else {
                         winuser::CheckMenuItem(
                             winuser::GetMenu(msg.hwnd),
-                            (*M_FRAME_HOOK).try_into().unwrap(),
+                            (*M_PLAYHEAD_ID).try_into().unwrap(),
                             winuser::MF_BYCOMMAND | winuser::MF_CHECKED,
                         );
 
@@ -483,11 +454,6 @@ impl<PTC: PTCVersion> Default for Runtime<PTC> {
     }
 }
 
-static mut LAST_PLAY_POS: u32 = 0;
-static mut LAST_PLAY_POS_TIME: Option<Instant> = None;
-static mut LAST_SCROLL: i32 = 0;
-static mut LAST_PLAYHEAD_POS: i32 = 0;
-
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
 //      which can be used to get the unit and focus state (which could be used to get the original color anyway)
 #[allow(clippy::too_many_lines)] // TODO
@@ -510,10 +476,10 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     let rect = std::slice::from_raw_parts(rect, 4);
 
     if PTC::is_playing() {
-        if rect[0] <= LAST_PLAYHEAD_POS {
+        if rect[0] <= crate::feature::scroll::LAST_PLAYHEAD_POS {
             // TODO: clean up this logic
             let flash_strength = if not_focused { 0.5 } else { 0.95 };
-            if rect[2] >= LAST_PLAYHEAD_POS {
+            if rect[2] >= crate::feature::scroll::LAST_PLAYHEAD_POS {
                 let get_event_value: unsafe extern "cdecl" fn(
                     pos_x: i32,
                     unit_no: i32,
@@ -521,9 +487,9 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
                 let volume: f32 =
-                    (get_event_value)(LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
+                    (get_event_value)(crate::feature::scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
                 let velocity: f32 =
-                    (get_event_value)(LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
+                    (get_event_value)(crate::feature::scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32 / 128.0;
 
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);
@@ -545,7 +511,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
             } else {
                 let fade_size = *PTC::get_measure_width() as i32 / 4;
-                let fade_pt = LAST_PLAYHEAD_POS - fade_size;
+                let fade_pt = crate::feature::scroll::LAST_PLAYHEAD_POS - fade_size;
 
                 let get_event_value: unsafe extern "cdecl" fn(
                     pos_x: i32,
@@ -668,70 +634,14 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     // println!("draw_unitkb_top called");
 
     if PTC::is_playing() {
-        {
-            let smooth = winuser::GetMenuState(
-                winuser::GetMenu(*PTC::get_hwnd()),
-                (*M_SMOOTH_SCROLL_ID).try_into().unwrap(),
-                winuser::MF_BYCOMMAND,
-            ) & winuser::MF_CHECKED
-                > 0;
-
-            let mut play_pos =
-                *PTC::get_play_pos() / PTC::get_buffer_size() * PTC::get_buffer_size();
-            if play_pos != LAST_PLAY_POS {
-                LAST_PLAY_POS_TIME = Some(Instant::now());
-                LAST_PLAY_POS = play_pos;
-            } else if let Some(i) = LAST_PLAY_POS_TIME {
-                play_pos += (44100.0
-                    * Instant::now()
-                        .saturating_duration_since(i)
-                        .as_secs_f32()
-                        .clamp(0.0, 0.5)) as u32;
-            }
-            // *((0xdd6d70 + 0x14) as *mut i32) = (((msg.time as f32) / 500.0).sin() * 100.0 + 300.0) as i32;
-            let mut des_scroll = (((play_pos as f32
-                * *PTC::get_tempo()
-                * 4.0
-                // * *PTC::get_beat_num() as f32
-                * *PTC::get_measure_width() as f32)
-                / (PTC::get_beat_clock() as f32))
-                / 22050.0) as i32;
-
-            LAST_SCROLL = des_scroll;
-
-            if smooth {
-                // let view_rect = PTC::get_unit_rect();
-                // des_scroll -= (view_rect[2] - view_rect[0]) / 2;
-                des_scroll -= (*PTC::get_measure_width() * 4) as i32;
-            } else {
-                des_scroll = des_scroll / (*PTC::get_measure_width() * 4) as i32
-                    * (*PTC::get_measure_width() * 4) as i32;
-            }
-
-            *PTC::get_scroll() = des_scroll.clamp(0, PTC::get_scroll_max());
-        }
-
         let unit_rect = PTC::get_unit_rect();
 
-        let x = unit_rect[0] - *PTC::get_scroll() + LAST_SCROLL;
-        LAST_PLAYHEAD_POS = x;
+        let x = crate::feature::scroll::LAST_PLAYHEAD_POS;
 
         let rect = [x, unit_rect[1], x + 2, unit_rect[3]];
         let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =
             std::mem::transmute(addr(0x1c0e0) as *const ());
         (draw_rect)(rect.as_ptr(), 0xcccccc);
-
-        // winuser::InvalidateRect(
-        //     *PTC::get_hwnd(),
-        //     0 as *const winapi::shared::windef::RECT,
-        //     0,
-        // );
-        winuser::RedrawWindow(
-            *PTC::get_hwnd(),
-            std::ptr::null(),
-            std::ptr::null_mut(),
-            winuser::RDW_INTERNALPAINT,
-        );
     }
 
     let fun_00009f80: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x9f80) as *const ());
@@ -795,46 +705,7 @@ fn frame_thread<PTC: PTCVersion>(_base: LPVOID) -> anyhow::Result<()> {
     unsafe {
         loop {
             if PTC::is_playing() {
-                // let smooth = winuser::GetMenuState(
-                //     winuser::GetMenu(*PTC::get_hwnd()),
-                //     M_SMOOTH_SCROLL_ID.try_into().unwrap(),
-                //     winuser::MF_BYCOMMAND,
-                // ) & winuser::MF_CHECKED
-                //     > 0;
-
-                // let mut play_pos =
-                //     *PTC::get_play_pos() / PTC::get_buffer_size() * PTC::get_buffer_size();
-                // if play_pos != LAST_PLAY_POS {
-                //     LAST_PLAY_POS_TIME = Some(Instant::now());
-                //     LAST_PLAY_POS = play_pos;
-                // } else if let Some(i) = LAST_PLAY_POS_TIME {
-                //     play_pos += (44100.0
-                //         * Instant::now()
-                //             .saturating_duration_since(i)
-                //             .as_secs_f32()
-                //             .clamp(0.0, 0.5)) as u32;
-                // }
-                // // *((0xdd6d70 + 0x14) as *mut i32) = (((msg.time as f32) / 500.0).sin() * 100.0 + 300.0) as i32;
-                // let mut des_scroll = (((play_pos as f32
-                //     * *PTC::get_tempo()
-                //     * 4.0
-                //     // * *PTC::get_beat_num() as f32
-                //     * *PTC::get_measure_width() as f32)
-                //     / (PTC::get_beat_clock() as f32))
-                //     / 22050.0) as i32;
-
-                // if smooth {
-                //     // let view_rect = PTC::get_unit_rect();
-                //     // des_scroll -= (view_rect[2] - view_rect[0]) / 2;
-                //     des_scroll -= (*PTC::get_measure_width() * 4) as i32;
-                // } else {
-                //     des_scroll = des_scroll / (*PTC::get_measure_width() * 4) as i32 * (*PTC::get_measure_width() * 4) as i32;
-                // }
-
-                // let old_scroll = *PTC::get_scroll();
-                // *PTC::get_scroll() += des_scroll - old_scroll;
                 winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
-                // winuser::UpdateWindow(*PTC::get_hwnd());
             }
 
             winapi::um::synchapi::Sleep(2);

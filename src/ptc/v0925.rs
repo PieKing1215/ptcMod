@@ -1,4 +1,4 @@
-use crate::{patch::Patch, feature::{Feature, custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock}};
+use crate::{patch::Patch, feature::{Feature, custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, scroll::Scroll}};
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::patch::MultiPatch;
@@ -10,9 +10,13 @@ pub struct PTC0925;
 impl PTCVersion for PTC0925 {
     
     fn get_features() -> Vec<Box<dyn Feature<Self>>> {
+        unsafe extern "stdcall" fn unit_clear_hook() {
+            crate::feature::scroll::unit_clear::<PTC0925>();
+        }
         vec![
             Box::new(CustomNoteRendering::new::<Self>()),
             Box::new(FPSUnlock::new::<Self>()),
+            Box::new(Scroll::new::<Self>(unit_clear_hook)),
         ]
     }
 
