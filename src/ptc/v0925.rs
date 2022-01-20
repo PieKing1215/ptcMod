@@ -1,13 +1,20 @@
-use crate::patch::PatchByte;
+use crate::{patch::Patch, feature::{Feature, custom_note_rendering::CustomNoteRendering}};
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
-use crate::patch::Patch;
+use crate::patch::MultiPatch;
 
 use super::{addr, PTCVersion};
 
 pub struct PTC0925;
 
 impl PTCVersion for PTC0925 {
+    
+    fn get_features() -> Vec<Box<dyn Feature<Self>>> {
+        vec![
+            Box::new(CustomNoteRendering::new::<Self>()),
+        ]
+    }
+
     fn get_hwnd() -> &'static mut HWND {
         unsafe { &mut *(addr(0xDD4440 - 0xd30000) as *mut HWND) }
     }
@@ -86,13 +93,6 @@ impl PTCVersion for PTC0925 {
         unsafe { *((*(addr(0xdd4434 - 0xd30000) as *mut usize) + 0x20) as *mut u32) }
     }
 
-    fn get_hook() -> unsafe extern "system" fn(code: i32, w_param: usize, l_param: isize) -> isize {
-        unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> isize {
-            crate::runtime::hook_ex::<PTC0925>(code, w_param, l_param)
-        }
-        hook_ex
-    }
-
     fn get_frame_thread_wrapper(
     ) -> unsafe extern "system" fn(base: winapi::shared::minwindef::LPVOID) -> u32 {
         unsafe extern "system" fn frame_thread_wrapper(
@@ -122,11 +122,11 @@ impl PTCVersion for PTC0925 {
         unsafe { &*(addr(0xa693c) as *const [i32; 4]) }
     }
 
-    fn get_patches() -> Vec<Patch> {
-        vec![Patch::new(vec![
-            PatchByte::new(addr(0x00d467f3 - 0xd30000), 0x01, 0x00),
-            PatchByte::new(addr(0x00d46808 - 0xd30000), 0x01, 0x72),
-            PatchByte::new(addr(0x00d46809 - 0xd30000), 0x01, 0xe8),
+    fn get_patches() -> Vec<MultiPatch> {
+        vec![MultiPatch::new(vec![
+            // Patch::new(addr(0x00d467f3 - 0xd30000), 0x01, 0x00),
+            // Patch::new(addr(0x00d46808 - 0xd30000), 0x01, 0x72),
+            // Patch::new(addr(0x00d46809 - 0xd30000), 0x01, 0xe8),
         ])]
     }
 

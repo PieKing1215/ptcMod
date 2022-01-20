@@ -5,6 +5,10 @@ use super::{addr, PTCVersion};
 pub struct PTC09454;
 
 impl PTCVersion for PTC09454 {
+    fn get_features() -> Vec<Box<dyn crate::feature::Feature<Self>>> {
+        vec![]
+    }
+
     fn get_hwnd() -> &'static mut HWND {
         unsafe { &mut *(addr(0xbddd0) as *mut HWND) }
     }
@@ -82,13 +86,6 @@ impl PTCVersion for PTC09454 {
         }
     }
 
-    fn get_hook() -> unsafe extern "system" fn(code: i32, w_param: usize, l_param: isize) -> isize {
-        unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> isize {
-            crate::runtime::hook_ex::<PTC09454>(code, w_param, l_param)
-        }
-        hook_ex
-    }
-
     fn get_frame_thread_wrapper(
     ) -> unsafe extern "system" fn(base: winapi::shared::minwindef::LPVOID) -> u32 {
         unsafe extern "system" fn frame_thread_wrapper(
@@ -115,7 +112,7 @@ impl PTCVersion for PTC09454 {
         todo!()
     }
 
-    fn get_patches() -> Vec<crate::patch::Patch> {
+    fn get_patches() -> Vec<crate::patch::MultiPatch> {
         todo!()
     }
 
@@ -130,5 +127,5 @@ impl PTCVersion for PTC09454 {
     fn get_hook_draw_unit_note_rect(
     ) -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
         todo!()
-    }
+    }   
 }

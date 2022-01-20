@@ -28,6 +28,7 @@ compile_error!("this is extremely windows dependent");
 mod patch;
 mod ptc;
 pub mod runtime;
+mod feature;
 
 #[allow(clippy::too_many_lines)] // TODO
 fn attach() -> anyhow::Result<()> {
@@ -171,7 +172,17 @@ fn detach() -> anyhow::Result<()> {
 unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
     match std::panic::catch_unwind(attach) {
         Err(err) => {
-            let l_msg: Vec<u16> = format!("attach panicked: {:?}\0", err)
+
+            let msg = match err.downcast_ref::<&'static str>() {
+                Some(s) => *s,
+                None => match err.downcast_ref::<String>() {
+                    Some(s) => &s[..],
+                    None => "Box<dyn Any>",
+                },
+            };
+            println!("attach panicked: {}", msg);
+
+            let l_msg: Vec<u16> = format!("attach panicked: {:?}\0", msg)
                 .encode_utf16()
                 .collect();
             let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
