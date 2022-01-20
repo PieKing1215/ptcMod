@@ -29,5 +29,5 @@ jobs:
       with:
         name: output
         path: |
-          target/i686-pc-windows-gnu/debug/ptc-mod.exe
-          target/i686-pc-windows-gnu/debug/ptc_mod.dll
+          target/i686-pc-windows-gnu/release/ptc-mod.exe
+          target/i686-pc-windows-gnu/release/ptc_mod.dll
