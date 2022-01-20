@@ -7,7 +7,7 @@ build = "src/build.rs"
 [dependencies]
 process-memory = "0.4"
 sysinfo = { version = "0.23", default-features = false }
-winapi = { version = "0.3", features = ["std", "everything"] }
+winapi = { version = "0.3", features = ["std", "winver"] }
 libc = { version = "0.2", features = ["use_std", "extra_traits"] }
 log = "0.4"
 simplelog = "0.11"
@@ -17,4 +17,4 @@ path-absolutize = "3.0" # so we can get absolute paths to missing files
 
 [lib]
 name = "ptc_mod"
-crate-type = ["dylib"] # dll
+crate-type = ["cdylib"] # dll
