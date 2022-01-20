@@ -11,14 +11,18 @@ impl PTCVersion for PTC0925 {
     
     fn get_features() -> Vec<Box<dyn Feature<Self>>> {
         unsafe extern "stdcall" fn unit_clear_hook() {
+            let unit_clear: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x16440) as *const ());
+            (unit_clear)();
             crate::feature::scroll::unit_clear::<PTC0925>();
         }
+        
         unsafe extern "cdecl" fn draw_unit_note_rect(
             rect: *const libc::c_int,
             color: libc::c_uint,
         ) {
             crate::feature::custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, color);
         }
+
         vec![
             Box::new(CustomNoteRendering::new::<Self>(draw_unit_note_rect)),
             Box::new(FPSUnlock::new::<Self>()),

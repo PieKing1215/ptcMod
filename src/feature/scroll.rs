@@ -138,8 +138,6 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
 }
 
 pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
-    let unit_clear: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x16440) as *const ());
-    (unit_clear)();
 
     // println!("draw_unitkb_top called");
 
