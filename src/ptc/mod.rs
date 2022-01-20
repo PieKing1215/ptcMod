@@ -31,8 +31,6 @@ pub trait PTCVersion {
     fn get_patches() -> Vec<MultiPatch>;
     fn get_hook_draw_unitkb_top() -> unsafe extern "stdcall" fn();
     fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn();
-    fn get_hook_draw_unit_note_rect(
-    ) -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint);
 }
 
 pub fn addr(relative: usize) -> usize {

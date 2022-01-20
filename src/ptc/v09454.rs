@@ -122,10 +122,5 @@ impl PTCVersion for PTC09454 {
 
     fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn() {
         todo!()
-    }
-
-    fn get_hook_draw_unit_note_rect(
-    ) -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
-        todo!()
-    }   
+    }  
 }

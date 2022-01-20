@@ -1,4 +1,4 @@
-use crate::{patch::Patch, feature::{Feature, custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, scroll::Scroll}};
+use crate::{feature::{Feature, custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, scroll::Scroll}};
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::patch::MultiPatch;
@@ -13,8 +13,14 @@ impl PTCVersion for PTC0925 {
         unsafe extern "stdcall" fn unit_clear_hook() {
             crate::feature::scroll::unit_clear::<PTC0925>();
         }
+        unsafe extern "cdecl" fn draw_unit_note_rect(
+            rect: *const libc::c_int,
+            color: libc::c_uint,
+        ) {
+            crate::feature::custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, color);
+        }
         vec![
-            Box::new(CustomNoteRendering::new::<Self>()),
+            Box::new(CustomNoteRendering::new::<Self>(draw_unit_note_rect)),
             Box::new(FPSUnlock::new::<Self>()),
             Box::new(Scroll::new::<Self>(unit_clear_hook)),
         ]
@@ -147,16 +153,5 @@ impl PTCVersion for PTC0925 {
             crate::runtime::draw_unitkb_bg::<PTC0925>();
         }
         draw_unitkb_bg
-    }
-
-    fn get_hook_draw_unit_note_rect(
-    ) -> unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) {
-        unsafe extern "cdecl" fn draw_unit_note_rect(
-            rect: *const libc::c_int,
-            color: libc::c_uint,
-        ) {
-            crate::runtime::draw_unit_note_rect::<PTC0925>(rect, color);
-        }
-        draw_unit_note_rect
     }
 }
