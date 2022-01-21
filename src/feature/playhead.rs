@@ -1,7 +1,7 @@
 use winapi::{shared::windef::HMENU, um::winuser};
 
 use crate::{
-    feature::scroll_mod,
+    feature::scroll_hook,
     patch::Patch,
     ptc::{addr, PTCVersion},
     runtime::{menu_toggle, next_id},
@@ -92,11 +92,11 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
                             unsafe { p.unapply() }.unwrap();
                         }
                     }
-                } else if low == *scroll_mod::M_SCROLL_HOOK_ID {
+                } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
                     unsafe {
                         let enabled = winuser::GetMenuState(
                             winuser::GetMenu(*PTC::get_hwnd()),
-                            (*scroll_mod::M_SCROLL_HOOK_ID).try_into().unwrap(),
+                            (*scroll_hook::M_SCROLL_HOOK_ID).try_into().unwrap(),
                             winuser::MF_BYCOMMAND,
                         ) & winuser::MF_CHECKED
                             > 0;
@@ -121,10 +121,10 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
 pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     // println!("draw_unitkb_top called");
 
-    if scroll_mod::ENABLED && PTC::is_playing() {
+    if scroll_hook::ENABLED && PTC::is_playing() {
         let unit_rect = PTC::get_unit_rect();
 
-        let x = crate::feature::scroll_mod::LAST_PLAYHEAD_POS;
+        let x = crate::feature::scroll_hook::LAST_PLAYHEAD_POS;
 
         let rect = [x, unit_rect[1], x + 2, unit_rect[3]];
         let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =
