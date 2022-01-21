@@ -13,10 +13,13 @@ lazy_static::lazy_static! {
     static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = next_id();
     static ref M_NOTE_PULSE_ID: u16 = next_id();
     static ref M_VOLUME_FADE_ID: u16 = next_id();
+    static ref M_COLORED_UNITS_ID: u16 = next_id();
 }
 
+// store our own values instead since calling winapi in the draw loop would be slow
 static mut NOTE_PULSE: bool = true;
 static mut VOLUME_FADE: bool = true;
+static mut COLORED_UNITS: bool = true;
 
 pub struct CustomNoteRendering {
     note_draw_patch: Vec<Patch>,
@@ -86,19 +89,19 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
             );
 
-            let l_title: Vec<u8> = "Note Pulse\0".bytes().collect();
+            let l_title: Vec<u8> = "Colored Units\0".bytes().collect();
             winuser::AppendMenuA(
                 menu,
                 winuser::MF_CHECKED,
-                *M_NOTE_PULSE_ID as usize,
+                *M_COLORED_UNITS_ID as usize,
                 l_title.as_ptr().cast::<i8>(),
             );
 
             winuser::CheckMenuItem(
                 menu,
-                *M_NOTE_PULSE_ID as u32,
+                *M_COLORED_UNITS_ID as u32,
                 winuser::MF_BYCOMMAND
-                    | if NOTE_PULSE {
+                    | if VOLUME_FADE {
                         winuser::MF_CHECKED
                     } else {
                         winuser::MF_UNCHECKED
@@ -107,7 +110,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 
             winuser::EnableMenuItem(
                 menu,
-                *M_NOTE_PULSE_ID as u32,
+                *M_COLORED_UNITS_ID as u32,
                 winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
             );
 
@@ -133,6 +136,31 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             winuser::EnableMenuItem(
                 menu,
                 *M_VOLUME_FADE_ID as u32,
+                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
+            );
+
+            let l_title: Vec<u8> = "Note Pulse\0".bytes().collect();
+            winuser::AppendMenuA(
+                menu,
+                winuser::MF_CHECKED,
+                *M_NOTE_PULSE_ID as usize,
+                l_title.as_ptr().cast::<i8>(),
+            );
+
+            winuser::CheckMenuItem(
+                menu,
+                *M_NOTE_PULSE_ID as u32,
+                winuser::MF_BYCOMMAND
+                    | if NOTE_PULSE {
+                        winuser::MF_CHECKED
+                    } else {
+                        winuser::MF_UNCHECKED
+                    },
+            );
+
+            winuser::EnableMenuItem(
+                menu,
+                *M_NOTE_PULSE_ID as u32,
                 winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
             );
         }
@@ -184,6 +212,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                                 *M_VOLUME_FADE_ID as u32,
                                 winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
                             );
+
+                            winuser::EnableMenuItem(
+                                winuser::GetMenu(msg.hwnd),
+                                *M_COLORED_UNITS_ID as u32,
+                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
+                            );
                         }
                     } else {
                         for p in &self.note_draw_patch {
@@ -202,6 +236,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                                 *M_VOLUME_FADE_ID as u32,
                                 winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
                             );
+
+                            winuser::EnableMenuItem(
+                                winuser::GetMenu(msg.hwnd),
+                                *M_COLORED_UNITS_ID as u32,
+                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
+                            );
                         }
                     }
                 } else if low == *M_NOTE_PULSE_ID {
@@ -211,6 +251,10 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 } else if low == *M_VOLUME_FADE_ID {
                     unsafe {
                         VOLUME_FADE = menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
+                    }
+                } else if low == *M_COLORED_UNITS_ID {
+                    unsafe {
+                        COLORED_UNITS = menu_toggle(msg.hwnd, *M_COLORED_UNITS_ID);
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
                     unsafe {
@@ -262,7 +306,9 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
     let unit = *((ebp - 0x80) as *mut u32);
 
-    rgb.adjust_hue(unit as f64 * 25.0);
+    if COLORED_UNITS {
+        rgb.adjust_hue(unit as f64 * 25.0);
+    }
 
     let rect = std::slice::from_raw_parts(rect, 4);
 
