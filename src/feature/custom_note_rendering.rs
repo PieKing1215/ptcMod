@@ -171,7 +171,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                             winuser::EnableMenuItem(
                                 winuser::GetMenu(msg.hwnd),
                                 *M_NOTE_PULSE_ID as u32,
-                                winuser::MF_BYCOMMAND | if scroll_hook::ENABLED { winuser::MF_ENABLED } else { winuser::MF_GRAYED },
+                                winuser::MF_BYCOMMAND
+                                    | if scroll_hook::ENABLED {
+                                        winuser::MF_ENABLED
+                                    } else {
+                                        winuser::MF_GRAYED
+                                    },
                             );
 
                             winuser::EnableMenuItem(
@@ -226,7 +231,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winuser::EnableMenuItem(
                             winuser::GetMenu(msg.hwnd),
                             *M_NOTE_PULSE_ID as u32,
-                            winuser::MF_BYCOMMAND | if scroll_hook_enabled && custom_rendering_enabled { winuser::MF_ENABLED } else { winuser::MF_GRAYED },
+                            winuser::MF_BYCOMMAND
+                                | if scroll_hook_enabled && custom_rendering_enabled {
+                                    winuser::MF_ENABLED
+                                } else {
+                                    winuser::MF_GRAYED
+                                },
                         );
                     }
                 }
