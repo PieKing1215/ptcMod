@@ -485,7 +485,7 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     if PTC::is_playing() {
         let unit_rect = PTC::get_unit_rect();
 
-        let x = crate::feature::scroll::LAST_PLAYHEAD_POS;
+        let x = crate::feature::custom_scroll::LAST_PLAYHEAD_POS;
 
         let rect = [x, unit_rect[1], x + 2, unit_rect[3]];
         let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =

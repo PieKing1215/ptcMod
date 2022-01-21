@@ -15,6 +15,8 @@ lazy_static::lazy_static! {
     static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
 }
 
+pub(crate) static mut ENABLED: bool = false;
+
 pub(crate) static mut LAST_PLAY_POS: u32 = 0;
 pub(crate) static mut LAST_PLAY_POS_TIME: Option<Instant> = None;
 pub(crate) static mut LAST_SCROLL: i32 = 0;
@@ -111,6 +113,8 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
                                 *M_SMOOTH_SCROLL_ID as u32,
                                 winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
                             );
+
+                            ENABLED = true;
                         }
                     } else {
                         for p in &self.patch {
@@ -123,6 +127,8 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
                                 *M_SMOOTH_SCROLL_ID as u32,
                                 winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
                             );
+
+                            ENABLED = false;
                         }
                     }
 

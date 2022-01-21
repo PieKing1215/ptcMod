@@ -1,5 +1,5 @@
 use crate::feature::{
-    custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, scroll::Scroll, Feature,
+    custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, custom_scroll::Scroll, Feature,
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -15,7 +15,7 @@ impl PTCVersion for PTC0925 {
             let unit_clear: unsafe extern "stdcall" fn() =
                 std::mem::transmute(addr(0x16440) as *const ());
             (unit_clear)();
-            crate::feature::scroll::unit_clear::<PTC0925>();
+            crate::feature::custom_scroll::unit_clear::<PTC0925>();
         }
 
         unsafe extern "cdecl" fn draw_unit_note_rect(

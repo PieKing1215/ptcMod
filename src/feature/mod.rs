@@ -1,6 +1,6 @@
 pub mod custom_note_rendering;
 pub mod fps_unlock;
-pub mod scroll;
+pub mod custom_scroll;
 
 use winapi::{shared::windef::HMENU, um::winuser::MSG};
 
