@@ -75,7 +75,6 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
     }
 
     fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
-        println!("{} {} {}", msg.message, msg.wParam, msg.lParam);
         if msg.message == winuser::WM_COMMAND {
             let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
             let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
