@@ -300,7 +300,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
     let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
 
-    let color = *(addr(0xa6cb4 + if not_focused { 0x4 } else { 0 }) as *mut u32);
+    let color = &*(addr(0xa6cb4 + if not_focused { 0x4 } else { 0 }) as *mut u32);
     let raw_argb = color.to_be_bytes();
     let mut rgb = colorsys::Rgb::from([raw_argb[1], raw_argb[2], raw_argb[3]]);
 
@@ -321,22 +321,6 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
             if rect[2] >= scroll_hook::LAST_PLAYHEAD_POS {
                 // right of note is to the right of the playhead (playhead is on the note)
 
-                let get_event_value: unsafe extern "cdecl" fn(
-                    pos_x: i32,
-                    unit_no: i32,
-                    ev_type: i32,
-                ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-
-                let volume: f32 =
-                    (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
-                        / 104.0;
-                let velocity: f32 =
-                    (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
-                        / 104.0;
-
-                let factor = volume * velocity;
-                let factor = factor.powf(0.25);
-
                 if NOTE_PULSE {
                     let mix = flash_strength as f64;
                     rgb.set_red(rgb.red() + (255.0 - rgb.red()) * mix);
@@ -345,6 +329,22 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 }
 
                 if VOLUME_FADE {
+                    let get_event_value: unsafe extern "cdecl" fn(
+                        pos_x: i32,
+                        unit_no: i32,
+                        ev_type: i32,
+                    ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
+    
+                    let volume: f32 =
+                        (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
+                            / 104.0;
+                    let velocity: f32 =
+                        (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
+                            / 104.0;
+    
+                    let factor = volume * velocity;
+                    let factor = factor.powf(0.25);
+
                     let fade_color: [u8; 4] = if not_focused {
                         0xff200040_u32
                     } else {
@@ -362,18 +362,6 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 let fade_size = *PTC::get_measure_width() as i32 / 4;
                 let fade_pt = scroll_hook::LAST_PLAYHEAD_POS - fade_size;
 
-                let get_event_value: unsafe extern "cdecl" fn(
-                    pos_x: i32,
-                    unit_no: i32,
-                    ev_type: i32,
-                ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-
-                let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
-                let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
-
-                let factor = volume * velocity;
-                let factor = factor.powf(0.25);
-
                 if NOTE_PULSE && rect[2] >= fade_pt {
                     let thru = (rect[2] - fade_pt) as f32 / fade_size as f32;
 
@@ -384,6 +372,19 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 }
 
                 if VOLUME_FADE {
+
+                    let get_event_value: unsafe extern "cdecl" fn(
+                        pos_x: i32,
+                        unit_no: i32,
+                        ev_type: i32,
+                    ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
+    
+                    let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
+                    let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
+    
+                    let factor = volume * velocity;
+                    let factor = factor.powf(0.25);
+
                     let fade_color: [u8; 4] = if not_focused {
                         0xff200040_u32
                     } else {
