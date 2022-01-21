@@ -7,7 +7,7 @@ use crate::{
     runtime::{menu_toggle, next_id},
 };
 
-use super::{Feature, custom_scroll};
+use super::{custom_scroll, Feature};
 
 lazy_static::lazy_static! {
     static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = next_id();
@@ -97,7 +97,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             winuser::CheckMenuItem(
                 menu,
                 *M_NOTE_PULSE_ID as u32,
-                winuser::MF_BYCOMMAND | if NOTE_PULSE { winuser::MF_CHECKED } else { winuser::MF_UNCHECKED },
+                winuser::MF_BYCOMMAND
+                    | if NOTE_PULSE {
+                        winuser::MF_CHECKED
+                    } else {
+                        winuser::MF_UNCHECKED
+                    },
             );
 
             winuser::EnableMenuItem(
@@ -117,7 +122,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             winuser::CheckMenuItem(
                 menu,
                 *M_VOLUME_FADE_ID as u32,
-                winuser::MF_BYCOMMAND | if VOLUME_FADE { winuser::MF_CHECKED } else { winuser::MF_UNCHECKED },
+                winuser::MF_BYCOMMAND
+                    | if VOLUME_FADE {
+                        winuser::MF_CHECKED
+                    } else {
+                        winuser::MF_UNCHECKED
+                    },
             );
 
             winuser::EnableMenuItem(
@@ -244,12 +254,10 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
                 let volume: f32 =
-                    (get_event_value)(custom_scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5)
-                        as f32
+                    (get_event_value)(custom_scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
                         / 128.0;
                 let velocity: f32 =
-                    (get_event_value)(custom_scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5)
-                        as f32
+                    (get_event_value)(custom_scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
                         / 128.0;
 
                 let factor = volume * velocity;

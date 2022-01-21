@@ -1,5 +1,6 @@
 use crate::feature::{
-    custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, custom_scroll::Scroll, Feature,
+    custom_note_rendering::CustomNoteRendering, custom_scroll::Scroll, fps_unlock::FPSUnlock,
+    Feature,
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
