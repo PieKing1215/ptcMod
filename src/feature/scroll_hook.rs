@@ -115,6 +115,8 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
                             );
 
                             ENABLED = true;
+                            
+                            winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
                         }
                     } else {
                         for p in &self.patch {
@@ -191,11 +193,6 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
         let x = unit_rect[0] - *PTC::get_scroll() + LAST_SCROLL;
         LAST_PLAYHEAD_POS = x;
 
-        winuser::RedrawWindow(
-            *PTC::get_hwnd(),
-            std::ptr::null(),
-            std::ptr::null_mut(),
-            winuser::RDW_INTERNALPAINT,
-        );
+        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
     }
 }
