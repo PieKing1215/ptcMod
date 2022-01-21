@@ -4,8 +4,6 @@ use crate::feature::{
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
-use crate::patch::MultiPatch;
-
 use super::{addr, PTCVersion};
 
 pub struct PTC0925;
@@ -138,14 +136,6 @@ impl PTCVersion for PTC0925 {
 
     fn get_unit_rect() -> &'static [i32; 4] {
         unsafe { &*(addr(0xa693c) as *const [i32; 4]) }
-    }
-
-    fn get_patches() -> Vec<MultiPatch> {
-        vec![MultiPatch::new(vec![
-            // Patch::new(addr(0x00d467f3 - 0xd30000), 0x01, 0x00),
-            // Patch::new(addr(0x00d46808 - 0xd30000), 0x01, 0x72),
-            // Patch::new(addr(0x00d46809 - 0xd30000), 0x01, 0xe8),
-        ])]
     }
 
     fn get_hook_draw_unitkb_top() -> unsafe extern "stdcall" fn() {

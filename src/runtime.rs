@@ -1,6 +1,5 @@
-use std::{cell::Cell, convert::TryInto, marker::PhantomData, sync::mpsc::Sender, time::Instant};
+use std::{cell::Cell, convert::TryInto, sync::mpsc::Sender};
 
-use colorsys::ColorTransform;
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 use winapi::{
@@ -16,7 +15,6 @@ const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
 use crate::{
     feature::Feature,
-    patch::Patch,
     ptc::{addr, PTCVersion},
 };
 
@@ -237,7 +235,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     MsgType::WinMsg(msg) => {
                         self.on_win_msg(msg);
                     }
-                    _ => {}
                 }
             }
 

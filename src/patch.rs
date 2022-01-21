@@ -3,21 +3,10 @@ use winapi::um::{memoryapi::VirtualProtect, winnt::PAGE_EXECUTE_READWRITE};
 use crate::ptc::addr;
 
 #[derive(Clone)]
-pub struct MultiPatch {
-    bytes: Vec<Patch>,
-}
-
-#[derive(Clone)]
 pub struct Patch {
     addr: usize,
     old: Vec<u8>,
     new: Vec<u8>,
-}
-
-impl MultiPatch {
-    pub fn new(bytes: Vec<Patch>) -> Self {
-        Self { bytes }
-    }
 }
 
 impl Patch {
