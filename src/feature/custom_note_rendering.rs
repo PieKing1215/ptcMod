@@ -154,7 +154,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
         }
     }
 
-    fn win_msg(&mut self, msg: &winuser::MSG) -> bool {
+    fn win_msg(&mut self, msg: &winuser::MSG) {
         if msg.message == winuser::WM_COMMAND {
             let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
             let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
@@ -199,8 +199,6 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                             );
                         }
                     }
-
-                    return true;
                 } else if low == *M_NOTE_PULSE_ID {
                     unsafe {
                         NOTE_PULSE = menu_toggle(msg.hwnd, *M_NOTE_PULSE_ID);
@@ -212,8 +210,6 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 }
             }
         }
-
-        false
     }
 }
 

@@ -29,7 +29,6 @@ pub(crate) fn next_id() -> u16 {
 }
 
 lazy_static::lazy_static! {
-    static ref M_PLAYHEAD_ID: u16 = next_id();
     static ref M_ABOUT_ID: u16 = next_id();
     static ref M_UNINJECT_ID: u16 = next_id();
 }
@@ -163,20 +162,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 l_title.as_ptr().cast::<i8>(),
             );
 
-            let l_title: Vec<u8> = "Playhead\0".bytes().collect();
-            winuser::AppendMenuA(
-                base,
-                winuser::MF_CHECKED,
-                *M_PLAYHEAD_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                base,
-                *M_PLAYHEAD_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
             for feat in &mut self.features {
                 feat.init(base);
             }
@@ -300,9 +285,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
     #[allow(clippy::too_many_lines)] // TODO
     unsafe fn on_win_msg(&mut self, msg: winuser::MSG) {
-        if self.features.iter_mut().any(|f| f.win_msg(&msg)) {
-            return;
-        }
+        self.features.iter_mut().for_each(|f| f.win_msg(&msg));
 
         if msg.message == winuser::WM_COMMAND {
             let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
@@ -321,116 +304,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     );
                 } else if low == *M_UNINJECT_ID {
                     SENDER.as_mut().unwrap().send(MsgType::Uninject).unwrap();
-                } else if low == *M_PLAYHEAD_ID {
-                    if winuser::GetMenuState(
-                        winuser::GetMenu(msg.hwnd),
-                        (*M_PLAYHEAD_ID).try_into().unwrap(),
-                        winuser::MF_BYCOMMAND,
-                    ) & winuser::MF_CHECKED
-                        > 0
-                    {
-                        winuser::CheckMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            (*M_PLAYHEAD_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-                        );
-
-                        let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x16625) as *mut libc::c_void,
-                            0x5,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        // call ptCollage.exe+87A0
-                        let bytes = i32::to_le_bytes(0x87a0 - (0x16625 + 0x5));
-                        *(crate::ptc::addr(0x16625) as *mut [u8; 5]) =
-                            [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
-
-                        VirtualProtect(
-                            crate::ptc::addr(0x16625) as *mut libc::c_void,
-                            0x5,
-                            lpfl_old_protect_1,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        // top
-
-                        let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x166c0) as *mut libc::c_void,
-                            0x5,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        // call ptCollage.exe+9f80
-                        let bytes = i32::to_le_bytes(0x9f80 - (0x166c0 + 0x5));
-                        *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) =
-                            [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
-
-                        VirtualProtect(
-                            crate::ptc::addr(0x166c0) as *mut libc::c_void,
-                            0x5,
-                            lpfl_old_protect_1,
-                            &mut lpfl_old_protect_1,
-                        );
-                    } else {
-                        winuser::CheckMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            (*M_PLAYHEAD_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND | winuser::MF_CHECKED,
-                        );
-
-                        let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x16625) as *mut libc::c_void,
-                            0x5,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        let target_addr = PTC::get_hook_draw_unitkb_bg() as *const () as usize;
-                        // println!("target_addr = {}", target_addr);
-                        let bytes = i32::to_le_bytes(
-                            (target_addr as i64 - (addr(0x16625) + 0x5) as i64) as i32,
-                        );
-                        // println!("bytes = {:?}", bytes);
-                        *(crate::ptc::addr(0x16625) as *mut [u8; 5]) =
-                            [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
-
-                        VirtualProtect(
-                            crate::ptc::addr(0x16625) as *mut libc::c_void,
-                            0x5,
-                            lpfl_old_protect_1,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        // top
-
-                        let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-                        VirtualProtect(
-                            crate::ptc::addr(0x166c0) as *mut libc::c_void,
-                            0x5,
-                            PAGE_EXECUTE_READWRITE,
-                            &mut lpfl_old_protect_1,
-                        );
-
-                        let target_addr = PTC::get_hook_draw_unitkb_top() as *const () as usize;
-                        let bytes = i32::to_le_bytes(
-                            (target_addr as i64 - (addr(0x166c0) + 0x5) as i64) as i32,
-                        );
-                        *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) =
-                            [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
-
-                        VirtualProtect(
-                            crate::ptc::addr(0x166c0) as *mut libc::c_void,
-                            0x5,
-                            lpfl_old_protect_1,
-                            &mut lpfl_old_protect_1,
-                        );
-                    }
                 }
             }
         } else if msg.message == winuser::WM_TIMER {
@@ -474,24 +347,6 @@ pub(crate) unsafe fn draw_unitkb_bg<PTC: PTCVersion>() {
 
     let fun_000087a0: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x87a0) as *const ());
     (fun_000087a0)();
-}
-
-pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
-    // println!("draw_unitkb_top called");
-
-    if PTC::is_playing() {
-        let unit_rect = PTC::get_unit_rect();
-
-        let x = crate::feature::custom_scroll::LAST_PLAYHEAD_POS;
-
-        let rect = [x, unit_rect[1], x + 2, unit_rect[3]];
-        let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =
-            std::mem::transmute(addr(0x1c0e0) as *const ());
-        (draw_rect)(rect.as_ptr(), 0xcccccc);
-    }
-
-    let fun_00009f80: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x9f80) as *const ());
-    (fun_00009f80)();
 }
 
 unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> isize {

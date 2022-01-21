@@ -11,8 +11,8 @@ use crate::{
 use super::Feature;
 
 lazy_static::lazy_static! {
-    static ref M_CUSTOM_SCROLL_ID: u16 = next_id();
-    static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
+    pub(crate) static ref M_CUSTOM_SCROLL_ID: u16 = next_id();
+    pub(crate) static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
 }
 
 pub(crate) static mut ENABLED: bool = false;
@@ -94,7 +94,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) -> bool {
+    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
         if msg.message == winuser::WM_COMMAND {
             let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
             let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
@@ -131,17 +131,11 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
                             ENABLED = false;
                         }
                     }
-
-                    return true;
                 } else if low == *M_SMOOTH_SCROLL_ID {
                     menu_toggle(msg.hwnd, *M_SMOOTH_SCROLL_ID);
-
-                    return true;
                 }
             }
         }
-
-        false
     }
 }
 

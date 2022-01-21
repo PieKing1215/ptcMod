@@ -65,7 +65,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) -> bool {
+    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
         if msg.message == winuser::WM_COMMAND {
             let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
             let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
@@ -81,18 +81,14 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
                         for p in &self.patch {
                             unsafe { p.unapply() }.unwrap();
                         }
-                        
+
                         unsafe {
                             // set wait time to tick time (otherwise it waits for it to catch up)
                             *(addr(0xa6fa4) as *mut u32) = *(addr(0xa6fa0) as *mut u32);
                         }
                     }
-
-                    return true;
                 }
             }
         }
-
-        false
     }
 }

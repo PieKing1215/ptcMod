@@ -28,7 +28,6 @@ pub trait PTCVersion {
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
     fn get_unit_rect() -> &'static [i32; 4];
-    fn get_hook_draw_unitkb_top() -> unsafe extern "stdcall" fn();
     fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn();
 }
 
