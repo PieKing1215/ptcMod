@@ -11,7 +11,12 @@ use super::{Feature, custom_scroll};
 
 lazy_static::lazy_static! {
     static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = next_id();
+    static ref M_NOTE_PULSE_ID: u16 = next_id();
+    static ref M_VOLUME_FADE_ID: u16 = next_id();
 }
+
+static mut NOTE_PULSE: bool = true;
+static mut VOLUME_FADE: bool = true;
 
 pub struct CustomNoteRendering {
     note_draw_patch: Vec<Patch>,
@@ -58,27 +63,67 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
     fn init(&mut self, _menu: HMENU) {
         unsafe {
             let h_menu = winuser::GetMenu(*PTC::get_hwnd());
-            let base = winuser::CreateMenu();
+            let menu = winuser::CreateMenu();
             let l_title: Vec<u8> = "Rendering\0".bytes().collect();
             winuser::AppendMenuA(
                 h_menu,
                 winuser::MF_POPUP,
-                base as usize,
+                menu as usize,
                 l_title.as_ptr().cast::<i8>(),
             );
 
             let l_title: Vec<u8> = "Enabled\0".bytes().collect();
             winuser::AppendMenuA(
-                base,
+                menu,
                 winuser::MF_CHECKED,
                 *M_CUSTOM_RENDERING_ENABLED_ID as usize,
                 l_title.as_ptr().cast::<i8>(),
             );
 
             winuser::CheckMenuItem(
-                base,
+                menu,
                 *M_CUSTOM_RENDERING_ENABLED_ID as u32,
                 winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
+            );
+
+            let l_title: Vec<u8> = "Unit Pulse\0".bytes().collect();
+            winuser::AppendMenuA(
+                menu,
+                winuser::MF_CHECKED,
+                *M_NOTE_PULSE_ID as usize,
+                l_title.as_ptr().cast::<i8>(),
+            );
+
+            winuser::CheckMenuItem(
+                menu,
+                *M_NOTE_PULSE_ID as u32,
+                winuser::MF_BYCOMMAND | if NOTE_PULSE { winuser::MF_CHECKED } else { winuser::MF_UNCHECKED },
+            );
+
+            winuser::EnableMenuItem(
+                menu,
+                *M_NOTE_PULSE_ID as u32,
+                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
+            );
+
+            let l_title: Vec<u8> = "Volume Fade\0".bytes().collect();
+            winuser::AppendMenuA(
+                menu,
+                winuser::MF_CHECKED,
+                *M_VOLUME_FADE_ID as usize,
+                l_title.as_ptr().cast::<i8>(),
+            );
+
+            winuser::CheckMenuItem(
+                menu,
+                *M_VOLUME_FADE_ID as u32,
+                winuser::MF_BYCOMMAND | if VOLUME_FADE { winuser::MF_CHECKED } else { winuser::MF_UNCHECKED },
+            );
+
+            winuser::EnableMenuItem(
+                menu,
+                *M_VOLUME_FADE_ID as u32,
+                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
             );
         }
     }
@@ -111,13 +156,49 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         for p in &self.note_draw_patch {
                             unsafe { p.apply() }.unwrap();
                         }
+
+                        unsafe {
+                            winuser::EnableMenuItem(
+                                winuser::GetMenu(msg.hwnd),
+                                *M_NOTE_PULSE_ID as u32,
+                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
+                            );
+
+                            winuser::EnableMenuItem(
+                                winuser::GetMenu(msg.hwnd),
+                                *M_VOLUME_FADE_ID as u32,
+                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
+                            );
+                        }
                     } else {
                         for p in &self.note_draw_patch {
                             unsafe { p.unapply() }.unwrap();
                         }
+
+                        unsafe {
+                            winuser::EnableMenuItem(
+                                winuser::GetMenu(msg.hwnd),
+                                *M_NOTE_PULSE_ID as u32,
+                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
+                            );
+
+                            winuser::EnableMenuItem(
+                                winuser::GetMenu(msg.hwnd),
+                                *M_VOLUME_FADE_ID as u32,
+                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
+                            );
+                        }
                     }
 
                     return true;
+                } else if low == *M_NOTE_PULSE_ID {
+                    unsafe {
+                        NOTE_PULSE = menu_toggle(msg.hwnd, *M_NOTE_PULSE_ID);
+                    }
+                } else if low == *M_VOLUME_FADE_ID {
+                    unsafe {
+                        VOLUME_FADE = menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
+                    }
                 }
             }
         }
@@ -149,9 +230,13 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
     if PTC::is_playing() {
         if custom_scroll::ENABLED && rect[0] <= custom_scroll::LAST_PLAYHEAD_POS {
+            // left of note is to the left of the playhead
+
             // TODO: clean up this logic
             let flash_strength = if not_focused { 0.5 } else { 0.95 };
             if rect[2] >= custom_scroll::LAST_PLAYHEAD_POS {
+                // right of note is to the right of the playhead (playhead is on the note)
+
                 let get_event_value: unsafe extern "cdecl" fn(
                     pos_x: i32,
                     unit_no: i32,
@@ -170,22 +255,28 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);
 
-                let mix = flash_strength as f64;
-                rgb.set_red(rgb.red() + (255.0 - rgb.red()) * mix);
-                rgb.set_green(rgb.green() + (255.0 - rgb.green()) * mix);
-                rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
-
-                let fade_color: [u8; 4] = if not_focused {
-                    0xff200040_u32
-                } else {
-                    0xff400070
+                if NOTE_PULSE {
+                    let mix = flash_strength as f64;
+                    rgb.set_red(rgb.red() + (255.0 - rgb.red()) * mix);
+                    rgb.set_green(rgb.green() + (255.0 - rgb.green()) * mix);
+                    rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
                 }
-                .to_be_bytes();
-                let mix = 1.0 - factor as f64 * 0.8;
-                rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
-                rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
-                rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
+
+                if VOLUME_FADE {
+                    let fade_color: [u8; 4] = if not_focused {
+                        0xff200040_u32
+                    } else {
+                        0xff400070
+                    }
+                    .to_be_bytes();
+                    let mix = 1.0 - factor as f64 * 0.8;
+                    rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
+                    rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
+                    rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
+                }
             } else {
+                // right of note is to the left of the playhead (playhead is past the note)
+
                 let fade_size = *PTC::get_measure_width() as i32 / 4;
                 let fade_pt = custom_scroll::LAST_PLAYHEAD_POS - fade_size;
 
@@ -201,7 +292,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);
 
-                if rect[2] >= fade_pt {
+                if NOTE_PULSE && rect[2] >= fade_pt {
                     let thru = (rect[2] - fade_pt) as f32 / fade_size as f32;
 
                     let mix = thru as f64 * flash_strength as f64;
@@ -210,18 +301,22 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                     rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
                 }
 
-                let fade_color: [u8; 4] = if not_focused {
-                    0xff200040_u32
-                } else {
-                    0xff400070
+                if VOLUME_FADE {
+                    let fade_color: [u8; 4] = if not_focused {
+                        0xff200040_u32
+                    } else {
+                        0xff400070
+                    }
+                    .to_be_bytes();
+                    let mix = 1.0 - (factor as f64) * 0.8;
+                    rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
+                    rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
+                    rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
                 }
-                .to_be_bytes();
-                let mix = 1.0 - (factor as f64) * 0.8;
-                rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
-                rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
-                rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
             }
-        } else {
+        } else if VOLUME_FADE {
+            // left of note is to the right of the playhead (note not played yet)
+
             let fade_color: [u8; 4] = if not_focused {
                 0xff200040_u32
             } else {
