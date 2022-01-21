@@ -80,10 +80,11 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
                     } else {
                         for p in &self.patch {
                             unsafe { p.unapply() }.unwrap();
-                            unsafe {
-                                // set wait time to tick time (otherwise it waits for it to catch up)
-                                *(addr(0xa6fa4) as *mut u32) = *(addr(0xa6fa0) as *mut u32);
-                            }
+                        }
+                        
+                        unsafe {
+                            // set wait time to tick time (otherwise it waits for it to catch up)
+                            *(addr(0xa6fa4) as *mut u32) = *(addr(0xa6fa0) as *mut u32);
                         }
                     }
 
