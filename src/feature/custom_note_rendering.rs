@@ -7,7 +7,7 @@ use crate::{
     runtime::{menu_toggle, next_id},
 };
 
-use super::{custom_scroll, Feature};
+use super::{scroll_mod, Feature};
 
 lazy_static::lazy_static! {
     static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = next_id();
@@ -235,12 +235,12 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     let rect = std::slice::from_raw_parts(rect, 4);
 
     if PTC::is_playing() {
-        if custom_scroll::ENABLED && rect[0] <= custom_scroll::LAST_PLAYHEAD_POS {
+        if scroll_mod::ENABLED && rect[0] <= scroll_mod::LAST_PLAYHEAD_POS {
             // left of note is to the left of the playhead
 
             // TODO: clean up this logic
             let flash_strength = if not_focused { 0.5 } else { 0.95 };
-            if rect[2] >= custom_scroll::LAST_PLAYHEAD_POS {
+            if rect[2] >= scroll_mod::LAST_PLAYHEAD_POS {
                 // right of note is to the right of the playhead (playhead is on the note)
 
                 let get_event_value: unsafe extern "cdecl" fn(
@@ -250,10 +250,10 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
                 let volume: f32 =
-                    (get_event_value)(custom_scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
+                    (get_event_value)(scroll_mod::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
                         / 128.0;
                 let velocity: f32 =
-                    (get_event_value)(custom_scroll::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
+                    (get_event_value)(scroll_mod::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
                         / 128.0;
 
                 let factor = volume * velocity;
@@ -282,7 +282,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 // right of note is to the left of the playhead (playhead is past the note)
 
                 let fade_size = *PTC::get_measure_width() as i32 / 4;
-                let fade_pt = custom_scroll::LAST_PLAYHEAD_POS - fade_size;
+                let fade_pt = scroll_mod::LAST_PLAYHEAD_POS - fade_size;
 
                 let get_event_value: unsafe extern "cdecl" fn(
                     pos_x: i32,

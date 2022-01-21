@@ -11,7 +11,7 @@ use crate::{
 use super::Feature;
 
 lazy_static::lazy_static! {
-    pub(crate) static ref M_CUSTOM_SCROLL_ID: u16 = next_id();
+    pub(crate) static ref M_SCROLL_HOOK_ID: u16 = next_id();
     pub(crate) static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
 }
 
@@ -48,17 +48,17 @@ impl Scroll {
 impl<PTC: PTCVersion> Feature<PTC> for Scroll {
     fn init(&mut self, menu: HMENU) {
         unsafe {
-            let l_title: Vec<u8> = "Custom Scroll\0".bytes().collect();
+            let l_title: Vec<u8> = "Scroll Hook\0".bytes().collect();
             winuser::AppendMenuA(
                 menu,
                 winuser::MF_CHECKED,
-                *M_CUSTOM_SCROLL_ID as usize,
+                *M_SCROLL_HOOK_ID as usize,
                 l_title.as_ptr().cast::<i8>(),
             );
 
             winuser::CheckMenuItem(
                 menu,
-                *M_CUSTOM_SCROLL_ID as u32,
+                *M_SCROLL_HOOK_ID as u32,
                 winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
             );
 
@@ -101,8 +101,8 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {
-                if low == *M_CUSTOM_SCROLL_ID {
-                    if menu_toggle(msg.hwnd, *M_CUSTOM_SCROLL_ID) {
+                if low == *M_SCROLL_HOOK_ID {
+                    if menu_toggle(msg.hwnd, *M_SCROLL_HOOK_ID) {
                         for p in &self.patch {
                             unsafe { p.apply() }.unwrap();
                         }

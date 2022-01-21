@@ -1,5 +1,5 @@
 pub mod custom_note_rendering;
-pub mod custom_scroll;
+pub mod scroll_mod;
 pub mod fps_unlock;
 pub mod playhead;
 
