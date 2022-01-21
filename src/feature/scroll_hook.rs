@@ -115,7 +115,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
                             );
 
                             ENABLED = true;
-                            
+
                             winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
                         }
                     } else {
