@@ -86,7 +86,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
             );
 
-            let l_title: Vec<u8> = "Unit Pulse\0".bytes().collect();
+            let l_title: Vec<u8> = "Note Pulse\0".bytes().collect();
             winuser::AppendMenuA(
                 menu,
                 winuser::MF_CHECKED,
@@ -171,7 +171,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                             winuser::EnableMenuItem(
                                 winuser::GetMenu(msg.hwnd),
                                 *M_NOTE_PULSE_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
+                                winuser::MF_BYCOMMAND | if scroll_hook::ENABLED { winuser::MF_ENABLED } else { winuser::MF_GRAYED },
                             );
 
                             winuser::EnableMenuItem(
@@ -206,6 +206,28 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 } else if low == *M_VOLUME_FADE_ID {
                     unsafe {
                         VOLUME_FADE = menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
+                    }
+                } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
+                    unsafe {
+                        let scroll_hook_enabled = winuser::GetMenuState(
+                            winuser::GetMenu(*PTC::get_hwnd()),
+                            (*scroll_hook::M_SCROLL_HOOK_ID).try_into().unwrap(),
+                            winuser::MF_BYCOMMAND,
+                        ) & winuser::MF_CHECKED
+                            > 0;
+
+                        let custom_rendering_enabled = winuser::GetMenuState(
+                            winuser::GetMenu(*PTC::get_hwnd()),
+                            (*M_CUSTOM_RENDERING_ENABLED_ID).try_into().unwrap(),
+                            winuser::MF_BYCOMMAND,
+                        ) & winuser::MF_CHECKED
+                            > 0;
+
+                        winuser::EnableMenuItem(
+                            winuser::GetMenu(msg.hwnd),
+                            *M_NOTE_PULSE_ID as u32,
+                            winuser::MF_BYCOMMAND | if scroll_hook_enabled && custom_rendering_enabled { winuser::MF_ENABLED } else { winuser::MF_GRAYED },
+                        );
                     }
                 }
             }
