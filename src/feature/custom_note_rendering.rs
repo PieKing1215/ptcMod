@@ -261,7 +261,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
             // left of note is to the left of the playhead
 
             // TODO: clean up this logic
-            let flash_strength = if not_focused { 0.5 } else { 0.95 };
+            let flash_strength = if not_focused { 0.4 } else { 0.8 };
             if rect[2] >= scroll_hook::LAST_PLAYHEAD_POS {
                 // right of note is to the right of the playhead (playhead is on the note)
 
@@ -273,10 +273,10 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
                 let volume: f32 =
                     (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
-                        / 128.0;
+                        / 104.0;
                 let velocity: f32 =
                     (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
-                        / 128.0;
+                        / 104.0;
 
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);
@@ -295,7 +295,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                         0xff400070
                     }
                     .to_be_bytes();
-                    let mix = 1.0 - factor as f64 * 0.8;
+                    let mix = (1.0 - factor as f64 * 0.8 - 0.2).clamp(0.0, 1.0);
                     rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
                     rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
                     rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
@@ -312,8 +312,8 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                     ev_type: i32,
                 ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
-                let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 128.0;
-                let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 128.0;
+                let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
+                let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
 
                 let factor = volume * velocity;
                 let factor = factor.powf(0.25);
@@ -334,7 +334,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                         0xff400070
                     }
                     .to_be_bytes();
-                    let mix = 1.0 - (factor as f64) * 0.8;
+                    let mix = (1.0 - (factor as f64) * 0.8 - 0.2).clamp(0.0, 1.0);
                     rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
                     rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
                     rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
@@ -356,13 +356,13 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 ev_type: i32,
             ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
 
-            let volume: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 128.0;
-            let velocity: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 128.0;
+            let volume: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 104.0;
+            let velocity: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 104.0;
 
             let factor = volume * velocity;
             let factor = factor.powf(0.25);
 
-            let mix = 1.0 - (factor as f64) * 0.8;
+            let mix = (1.0 - (factor as f64) * 0.8 - 0.2).clamp(0.0, 1.0);
             rgb.set_red(rgb.red() + (fade_color[1] as f64 - rgb.red()) * mix);
             rgb.set_green(rgb.green() + (fade_color[2] as f64 - rgb.green()) * mix);
             rgb.set_blue(rgb.blue() + (fade_color[3] as f64 - rgb.blue()) * mix);
