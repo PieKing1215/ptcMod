@@ -121,16 +121,6 @@ impl PTCVersion for PTC0925 {
         unsafe { *((*(addr(0xdd4434 - 0xd30000) as *mut usize) + 0x20) as *mut u32) }
     }
 
-    fn get_frame_thread_wrapper(
-    ) -> unsafe extern "system" fn(base: winapi::shared::minwindef::LPVOID) -> u32 {
-        unsafe extern "system" fn frame_thread_wrapper(
-            base: winapi::shared::minwindef::LPVOID,
-        ) -> u32 {
-            crate::runtime::frame_thread_wrapper_ex::<PTC0925>(base)
-        }
-        frame_thread_wrapper
-    }
-
     fn get_play_pos() -> &'static mut u32 {
         unsafe { &mut *((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x54) as *mut u32) }
     }
@@ -148,12 +138,5 @@ impl PTCVersion for PTC0925 {
 
     fn get_unit_rect() -> &'static [i32; 4] {
         unsafe { &*(addr(0xa693c) as *const [i32; 4]) }
-    }
-
-    fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn() {
-        unsafe extern "stdcall" fn draw_unitkb_bg() {
-            crate::runtime::draw_unitkb_bg::<PTC0925>();
-        }
-        draw_unitkb_bg
     }
 }

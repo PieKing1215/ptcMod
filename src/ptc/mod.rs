@@ -22,13 +22,10 @@ pub trait PTCVersion {
     fn get_measure_width() -> &'static mut u32;
     fn get_sample_rate() -> u32;
     fn get_buffer_size() -> u32;
-    fn get_frame_thread_wrapper(
-    ) -> unsafe extern "system" fn(base: winapi::shared::minwindef::LPVOID) -> u32;
     fn get_play_pos() -> &'static mut u32;
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
     fn get_unit_rect() -> &'static [i32; 4];
-    fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn();
 }
 
 pub fn addr(relative: usize) -> usize {

@@ -3,11 +3,8 @@ use std::{cell::Cell, convert::TryInto, sync::mpsc::Sender};
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 use winapi::{
-    shared::{minwindef::LPVOID, windef::HWND},
-    um::{
-        libloaderapi::GetModuleHandleA, memoryapi::VirtualProtect, winnt::PAGE_EXECUTE_READWRITE,
-        winuser,
-    },
+    shared::windef::HWND,
+    um::{libloaderapi::GetModuleHandleA, winuser},
 };
 
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
@@ -140,18 +137,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 winuser::MB_OK | winuser::MB_ICONINFORMATION,
             );
 
-            // let log_debug: unsafe extern "fastcall" fn(
-            //     param_1: libc::c_int,
-            //     param_2: libc::c_int,
-            //     text: *const libc::c_char,
-            // ) = std::mem::transmute(0x00d4ddf0 as *const ());
-            // (log_debug)(0, 0x208, msg.as_ptr() as *const libc::c_char);
-            // (log_debug)(*(0x00dd4434 as *const libc::c_int), 123, CString::new("PTC Mod %d").unwrap().into_raw());
-            // (log_debug)(*(0x00dd4434 as *const libc::c_int), *(0x00dd4424 as *const libc::c_int), CString::new("PTC Mod2").unwrap().into_raw());
-
-            // let log_debug = &*(0x00d4ddf0 as *const LogDebugFn);
-            // log_debug(0, 0, CString::new("PTC Mod").unwrap().into_raw());
-
             let h_menu = winuser::GetMenu(*hwnd);
             let base = winuser::CreateMenu();
             let l_title: Vec<u8> = "PTC Mod\0".bytes().collect();
@@ -179,15 +164,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
             winuser::DrawMenuBar(*hwnd);
 
-            // let event_thread = winapi::um::processthreadsapi::CreateThread(
-            //     std::ptr::null_mut(),
-            //     0,
-            //     Some(event_thread),
-            //     std::ptr::null_mut(),
-            //     0,
-            //     std::ptr::null_mut(),
-            // );
-
             let window_thread = winuser::GetWindowThreadProcessId(*hwnd, std::ptr::null_mut());
             let (tx, rx) = std::sync::mpsc::channel::<MsgType>();
             SENDER = Some(tx);
@@ -198,21 +174,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 window_thread,
             );
 
-            let frame_thread = winapi::um::processthreadsapi::CreateThread(
-                // make a thread to live in
-                std::ptr::null_mut(),
-                0,
-                Some(PTC::get_frame_thread_wrapper()),
-                std::ptr::null_mut(),
-                0,
-                std::ptr::null_mut(),
-            );
-
-            // let timer = winuser::SetTimer(*hwnd, SMOOTH_SCROLL_TIMER_ID, 1, None);
-
-            // PTC::start_play();
-
-            // wait for uninject signal
+            // block for signals from windows
             loop {
                 let v = rx.recv().unwrap();
                 match v {
@@ -229,51 +191,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 feat.cleanup();
             }
 
-            let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-            VirtualProtect(
-                crate::ptc::addr(0x16625) as *mut libc::c_void,
-                0x5,
-                PAGE_EXECUTE_READWRITE,
-                &mut lpfl_old_protect_1,
-            );
-
-            // call ptCollage.exe+87A0
-            let bytes = i32::to_le_bytes(0x87a0 - (0x16625 + 0x5));
-            *(crate::ptc::addr(0x16625) as *mut [u8; 5]) =
-                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
-
-            VirtualProtect(
-                crate::ptc::addr(0x16625) as *mut libc::c_void,
-                0x5,
-                lpfl_old_protect_1,
-                &mut lpfl_old_protect_1,
-            );
-
-            // top
-
-            let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
-            VirtualProtect(
-                crate::ptc::addr(0x166c0) as *mut libc::c_void,
-                0x5,
-                PAGE_EXECUTE_READWRITE,
-                &mut lpfl_old_protect_1,
-            );
-
-            // call ptCollage.exe+87A0
-            let bytes = i32::to_le_bytes(0x9f80 - (0x166c0 + 0x5));
-            *(crate::ptc::addr(0x166c0) as *mut [u8; 5]) =
-                [0xe8, bytes[0], bytes[1], bytes[2], bytes[3]];
-
-            VirtualProtect(
-                crate::ptc::addr(0x166c0) as *mut libc::c_void,
-                0x5,
-                lpfl_old_protect_1,
-                &mut lpfl_old_protect_1,
-            );
-
-            winapi::um::processthreadsapi::TerminateThread(frame_thread, 0);
-            // winuser::KillTimer(*hwnd, timer);
-
             winuser::RemoveMenu(h_menu, 4, winuser::MF_BYPOSITION);
             winuser::DrawMenuBar(*hwnd);
 
@@ -283,7 +200,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
         Ok(())
     }
 
-    #[allow(clippy::too_many_lines)] // TODO
     unsafe fn on_win_msg(&mut self, msg: winuser::MSG) {
         self.features.iter_mut().for_each(|f| f.win_msg(&msg));
 
@@ -306,16 +222,6 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     SENDER.as_mut().unwrap().send(MsgType::Uninject).unwrap();
                 }
             }
-        } else if msg.message == winuser::WM_TIMER {
-            // let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            // let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
-            // let l_msg: Vec<u16> = format!("message = {}\n{} high = {}\nlow = {}\0", msg.wParam, msg.message, high, low).encode_utf16().collect();
-            // let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-            // winuser::MessageBoxW(msg.hwnd, l_msg.as_ptr(), l_title.as_ptr(), winuser::MB_OK | winuser::MB_ICONINFORMATION);
-
-            // match msg.wParam {
-            //     _ => {}
-            // }
         }
     }
 }
@@ -326,31 +232,10 @@ impl<PTC: PTCVersion> Default for Runtime<PTC> {
     }
 }
 
-pub(crate) unsafe fn draw_unitkb_bg<PTC: PTCVersion>() {
-    // println!("draw_unitkb_bg called");
-
-    // let mut play_pos = LAST_PLAY_POS;
-    // if let Some(i) = LAST_PLAY_POS_TIME {
-    //     play_pos += (44100.0
-    //         * Instant::now()
-    //             .saturating_duration_since(i)
-    //             .as_secs_f32()
-    //             .clamp(0.0, 0.5)) as u32;
-    // }
-
-    // let x = (play_pos as f32 / 10000.0).sin() * 50.0 + 200.0;
-    // let y = (play_pos as f32 / 10000.0).cos() * 50.0 + 250.0;
-    // let rect = [x as i32, y as i32, x as i32 + 20, y as i32 + 20];
-    // let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =
-    //     std::mem::transmute(addr(0x1c0e0) as *const ());
-    // (draw_rect)(rect.as_ptr(), 0x00ff00);
-
-    let fun_000087a0: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x87a0) as *const ());
-    (fun_000087a0)();
-}
-
 unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> isize {
     if code >= 0 {
+        // need to copy since we handle this on the main thread, so the pointer will be gone
+        // (not sure if this is really safe or not)
         let msg = *(l_param as *const winuser::MSG);
         SENDER.as_mut().unwrap().send(MsgType::WinMsg(msg)).unwrap();
     }
@@ -396,35 +281,6 @@ unsafe extern "system" fn fill_about_dialog(
                 winuser::EndDialog(hwnd, 0);
             }
         }
-    }
-
-    0
-}
-
-fn frame_thread<PTC: PTCVersion>(_base: LPVOID) -> anyhow::Result<()> {
-    unsafe {
-        loop {
-            if PTC::is_playing() {
-                winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
-            }
-
-            winapi::um::synchapi::Sleep(2);
-        }
-    }
-}
-
-pub(crate) unsafe fn frame_thread_wrapper_ex<PTC: PTCVersion>(base: LPVOID) -> u32 {
-    if let Err(err) = frame_thread::<PTC>(base) {
-        let l_msg: Vec<u16> = format!("frame_thread exited with an Err: {:?}\0", err)
-            .encode_utf16()
-            .collect();
-        let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-        winuser::MessageBoxW(
-            *PTC::get_hwnd(),
-            l_msg.as_ptr(),
-            l_title.as_ptr(),
-            winuser::MB_OK | winuser::MB_ICONERROR,
-        );
     }
 
     0

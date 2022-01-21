@@ -86,16 +86,6 @@ impl PTCVersion for PTC09454 {
         }
     }
 
-    fn get_frame_thread_wrapper(
-    ) -> unsafe extern "system" fn(base: winapi::shared::minwindef::LPVOID) -> u32 {
-        unsafe extern "system" fn frame_thread_wrapper(
-            base: winapi::shared::minwindef::LPVOID,
-        ) -> u32 {
-            crate::runtime::frame_thread_wrapper_ex::<PTC09454>(base)
-        }
-        frame_thread_wrapper
-    }
-
     fn get_play_pos() -> &'static mut u32 {
         unsafe { &mut *((*(addr(0xBE020) as *mut usize) + 0x70) as *mut u32) }
     }
@@ -109,10 +99,6 @@ impl PTCVersion for PTC09454 {
     }
 
     fn get_unit_rect() -> &'static [i32; 4] {
-        todo!()
-    }
-
-    fn get_hook_draw_unitkb_bg() -> unsafe extern "stdcall" fn() {
         todo!()
     }
 }
