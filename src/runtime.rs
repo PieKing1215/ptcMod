@@ -10,10 +10,7 @@ use winapi::{
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
 const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
-use crate::{
-    feature::Feature,
-    ptc::{addr, PTCVersion},
-};
+use crate::{feature::Feature, ptc::PTCVersion};
 
 // system for assigning globally unique menu ids without hardcoded constants
 static mut MENU_ID_COUNTER: Cell<u16> = Cell::new(1000);
@@ -215,7 +212,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                         *PTC::get_hinstance(),
                         l_template.as_ptr().cast::<i8>(),
                         msg.hwnd,
-                        Some(fill_about_dialog),
+                        Some(PTC::get_fill_about_dialog()),
                         0,
                     );
                 } else if low == *M_UNINJECT_ID {
@@ -243,31 +240,27 @@ unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> 
     winuser::CallNextHookEx(std::ptr::null_mut(), code, w_param, l_param)
 }
 
-unsafe extern "system" fn fill_about_dialog(
+pub unsafe fn fill_about_dialog<PTC: PTCVersion>(
     hwnd: HWND,
     msg: u32,
     w_param: usize,
     l_param: isize,
 ) -> isize {
     if msg == winuser::WM_INITDIALOG {
+        let ids = PTC::get_about_dialog_text_ids();
         let msg_1: Vec<u8> = "PTC Mod\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x3f6, msg_1.as_ptr().cast::<i8>());
+        winuser::SetDlgItemTextA(hwnd, ids.0, msg_1.as_ptr().cast::<i8>());
         let msg_2: Vec<u8> = "PieKing1215\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x43a, msg_2.as_ptr().cast::<i8>());
+        winuser::SetDlgItemTextA(hwnd, ids.1, msg_2.as_ptr().cast::<i8>());
         let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown"))
             .bytes()
             .collect();
-        winuser::SetDlgItemTextA(hwnd, 0x40c, msg_3.as_ptr().cast::<i8>());
+        winuser::SetDlgItemTextA(hwnd, ids.2, msg_3.as_ptr().cast::<i8>());
         let msg_4: Vec<u8> = "alpha test\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x3ea, msg_4.as_ptr().cast::<i8>());
+        winuser::SetDlgItemTextA(hwnd, ids.3, msg_4.as_ptr().cast::<i8>());
 
-        let fn_1: unsafe extern "cdecl" fn(param_1: HWND) =
-            std::mem::transmute(addr(0x1e550) as *const ());
-        (fn_1)(hwnd);
-
-        let fn_2: unsafe extern "cdecl" fn(param_1: HWND) =
-            std::mem::transmute(addr(0x1d310) as *const ());
-        (fn_2)(hwnd);
+        PTC::center_window(hwnd);
+        PTC::about_dlg_fn_2(hwnd);
     } else if msg == winuser::WM_COMMAND {
         let high = winapi::shared::minwindef::HIWORD(w_param.try_into().unwrap());
         let low = winapi::shared::minwindef::LOWORD(w_param.try_into().unwrap());

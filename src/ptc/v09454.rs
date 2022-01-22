@@ -95,10 +95,47 @@ impl PTCVersion for PTC09454 {
     }
 
     fn get_scroll_max() -> i32 {
-        todo!()
+        unsafe {
+            *(addr(0xc02e0 + 0x14) as *mut i32)
+                - (*(addr(0xc02e0 + 0x68) as *mut f32) - *(addr(0xc02e0 + 0x60) as *mut f32)) as i32
+        }
     }
 
     fn get_unit_rect() -> &'static [i32; 4] {
         todo!()
+    }
+
+    fn get_fill_about_dialog(
+    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize
+    {
+        unsafe extern "system" fn fill_about_dialog(
+            hwnd: HWND,
+            msg: u32,
+            w_param: usize,
+            l_param: isize,
+        ) -> isize {
+            crate::runtime::fill_about_dialog::<PTC09454>(hwnd, msg, w_param, l_param)
+        }
+        fill_about_dialog
+    }
+
+    fn center_window(hwnd: HWND) {
+        unsafe {
+            let center_window: unsafe extern "cdecl" fn(param_1: HWND) =
+                std::mem::transmute(addr(0x24e0) as *const ());
+            (center_window)(hwnd);
+        }
+    }
+
+    fn about_dlg_fn_2(hwnd: HWND) {
+        unsafe {
+            let fn_2: unsafe extern "cdecl" fn(param_1: HWND) =
+                std::mem::transmute(addr(0x815e0) as *const ());
+            (fn_2)(hwnd);
+        }
+    }
+
+    fn get_about_dialog_text_ids() -> (i32, i32, i32, i32) {
+        (0x3f6, 0x439, 0x40b, 0x3ea)
     }
 }

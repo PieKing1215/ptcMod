@@ -9,6 +9,7 @@
 #![allow(clippy::cast_possible_truncation)]
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_lossless)]
+#![allow(clippy::missing_safety_doc)]
 
 use std::convert::TryInto;
 

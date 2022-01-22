@@ -334,14 +334,14 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                         unit_no: i32,
                         ev_type: i32,
                     ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-    
+
                     let volume: f32 =
                         (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
                             / 104.0;
                     let velocity: f32 =
                         (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
                             / 104.0;
-    
+
                     let factor = volume * velocity;
                     let factor = factor.powf(0.25);
 
@@ -372,16 +372,15 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 }
 
                 if VOLUME_FADE {
-
                     let get_event_value: unsafe extern "cdecl" fn(
                         pos_x: i32,
                         unit_no: i32,
                         ev_type: i32,
                     ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-    
+
                     let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
                     let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
-    
+
                     let factor = volume * velocity;
                     let factor = factor.powf(0.25);
 
