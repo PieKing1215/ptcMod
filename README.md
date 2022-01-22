@@ -70,3 +70,24 @@ Auto backup tool that automatically backs up the opened song at certain interval
 Tempo change tool - enter a list of tempo changes and it will reposition notes/events to match.
 
 Probably some more I can't think of.
+
+## License
+
+[pxtone](https://pxtone.org/) © [STUDIO PIXEL](https://studiopixel.jp)
+
+This project contains no code from the original ptCollage or pxtone tools.
+
+ptcMod licensed under either of
+
+ * Apache License, Version 2.0
+   ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license
+   ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+
+at your option.
+
+## Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
+dual licensed as above, without any additional terms or conditions.
