@@ -54,7 +54,7 @@ Requires Scroll Hook.
 <br><br>
 
 # Planned Features
-Fix support for 0.9.4.54
+Port custom rendering to 0.9.4.54
 
 Performance improvements (custom note rendering is extremely unoptimized)
 
@@ -73,6 +73,8 @@ Auto backup tool that automatically backs up the opened song at certain interval
 Tempo change tool - enter a list of tempo changes and it will reposition notes/events to match.
 
 Probably some more I can't think of.
+
+Feel free to suggest more on the [issue tracker](https://github.com/PieKing1215/ptcMod/issues)!
 
 ## Download
 For official releases, see [Releases](../../releases).<br>
