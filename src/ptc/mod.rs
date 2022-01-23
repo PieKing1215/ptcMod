@@ -25,7 +25,7 @@ pub trait PTCVersion {
     fn get_play_pos() -> &'static mut u32;
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
-    fn get_unit_rect() -> &'static [i32; 4];
+    fn get_unit_rect() -> [i32; 4];
     fn get_fill_about_dialog(
     ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize;
     fn center_window(hwnd: HWND);

@@ -11,7 +11,7 @@ pub struct PTC0925;
 impl PTCVersion for PTC0925 {
     fn get_features() -> Vec<Box<dyn Feature<Self>>> {
         // it is actually possible to move these extern fn definitions into the constructors using generics
-        // it might be a good idea to do that depending on how I want to handle the patches being different on different versions
+        // however keeping them here is better since the signatures of the hooked functions can change between ptc versions
 
         unsafe extern "stdcall" fn unit_clear_hook() {
             let unit_clear: unsafe extern "stdcall" fn() =
@@ -37,7 +37,11 @@ impl PTCVersion for PTC0925 {
 
         vec![
             Box::new(FPSUnlock::new::<Self>()),
-            Box::new(Scroll::new::<Self>(unit_clear_hook)),
+            Box::new(Scroll::new::<Self>(
+                unit_clear_hook as *const (),
+                0x165e8,
+                0x16440,
+            )),
             Box::new(CustomNoteRendering::new::<Self>(draw_unit_note_rect)),
             Box::new(Playhead::new::<Self>(draw_unitkb_top_hook)),
         ]
@@ -136,8 +140,8 @@ impl PTCVersion for PTC0925 {
         }
     }
 
-    fn get_unit_rect() -> &'static [i32; 4] {
-        unsafe { &*(addr(0xa693c) as *const [i32; 4]) }
+    fn get_unit_rect() -> [i32; 4] {
+        unsafe { *(addr(0xa693c) as *const [i32; 4]) }
     }
 
     fn get_fill_about_dialog(

@@ -1,12 +1,25 @@
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
+use crate::feature::scroll_hook::Scroll;
+
 use super::{addr, PTCVersion};
 
 pub struct PTC09454;
 
 impl PTCVersion for PTC09454 {
     fn get_features() -> Vec<Box<dyn crate::feature::Feature<Self>>> {
-        vec![]
+        unsafe extern "cdecl" fn unit_clear_hook(rect: *mut ()) {
+            let unit_clear: unsafe extern "cdecl" fn(rect: *mut ()) =
+                std::mem::transmute(addr(0x78a60) as *const ());
+            (unit_clear)(rect);
+            crate::feature::scroll_hook::unit_clear::<PTC09454>();
+        }
+
+        vec![Box::new(Scroll::new::<Self>(
+            unit_clear_hook as *const (),
+            0x79137,
+            0x78a60,
+        ))]
     }
 
     fn get_hwnd() -> &'static mut HWND {
@@ -101,8 +114,16 @@ impl PTCVersion for PTC09454 {
         }
     }
 
-    fn get_unit_rect() -> &'static [i32; 4] {
-        todo!()
+    fn get_unit_rect() -> [i32; 4] {
+        // this version's rectangles are floats while 0.9.2.5 is ints
+        unsafe {
+            [
+                *(addr(0xbfe48) as *const f32) as i32,
+                *(addr(0xbfe48 + 0x04) as *const f32) as i32,
+                *(addr(0xbfe48 + 0x08) as *const f32) as i32,
+                *(addr(0xbfe48 + 0x0c) as *const f32) as i32,
+            ]
+        }
     }
 
     fn get_fill_about_dialog(
