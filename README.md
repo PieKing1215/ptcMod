@@ -10,10 +10,13 @@ There is a chance it could explode your ptCollage at any moment and it has not b
 I would recommend not actually using this while composing right now.<br>
 If you must, save often and make some backups - if it randomly segfaults or something your unsaved changes will be very lost.
 
+## Support
+The goal is to continuously support at least both ptCollage 0.9.2.5 and whatever the latest version is.<br>
+Currently 0.9.2.5 has all of the features and 0.9.4.54 support is only partially implemented.
+
 ## Basic usage
 Have ptCollage.exe open and run the injector exe.<br>
-*(only ptc 0.9.2.5 is functional right now, support for the latest version is planned)<br>*
-A popup should appear on ptCollage saying it injected, and a new menu option "PTCMod" should appear in the menu bar.<br>
+A popup should appear on ptCollage saying it injected, and a new menu option "PTC Mod" should appear in the menu bar.<br>
 You can edit the mod's settings there, or click "Uninject" to close ptcMod.<br>
 *(ptcMod does not modify the actual ptCollage exe file, so you can also just close and reopen it to get rid of the mod)*
 
