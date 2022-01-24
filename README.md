@@ -77,7 +77,7 @@ Probably some more I can't think of.
 Feel free to suggest more on the [issue tracker](https://github.com/PieKing1215/ptcMod/issues)!
 
 ## Download
-For official releases, see [Releases](../../releases).<br>
+For "stable" releases (there are none right now), see [Releases](../../releases).<br>
 For dev builds: sign in to GitHub, go [here](https://github.com/PieKing1215/ptcMod/actions/workflows/rust.yml?query=branch%3Amaster+is%3Asuccess), click the latest one, scroll down to "Artifacts" and download it.<br>
 Or download at https://nightly.link/PieKing1215/ptcMod/workflows/rust/master/ptcMod.zip<br>
 Unzip and run ptc-mod.exe to run.
