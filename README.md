@@ -54,6 +54,8 @@ Requires Scroll Hook.
 <br><br>
 
 # Planned Features
+See [the Project page](https://github.com/users/PieKing1215/projects/2)
+
 Port custom rendering to 0.9.4.54
 
 Performance improvements (custom note rendering is extremely unoptimized)
