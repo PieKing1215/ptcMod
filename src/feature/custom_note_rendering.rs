@@ -27,30 +27,11 @@ pub struct CustomNoteRendering {
 
 impl CustomNoteRendering {
     pub fn new<PTC: PTCVersion>(
-        draw_unit_note_rect_hook: unsafe extern "cdecl" fn(
-            rect: *const libc::c_int,
-            color: libc::c_uint,
-        ),
+        note_rect_push_ebp: Patch,
+        note_rect_hook_patch: Patch,
+        note_disable_left_edge: Patch,
+        note_disable_right_edge: Patch,
     ) -> Self {
-        let old_bytes = i32::to_le_bytes(0x1c0e0 - (0x1469f + 0x5));
-
-        let new_bytes = i32::to_le_bytes(
-            (draw_unit_note_rect_hook as *const () as i64 - (addr(0x1469f) + 0x5) as i64) as i32,
-        );
-
-        let note_rect_hook_patch = Patch::new(
-            0x1469f,
-            vec![0xe8, old_bytes[0], old_bytes[1], old_bytes[2], old_bytes[3]],
-            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]],
-        )
-        .unwrap();
-
-        let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
-
-        let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
-
-        let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
-
         Self {
             note_draw_patch: vec![
                 note_rect_push_ebp,

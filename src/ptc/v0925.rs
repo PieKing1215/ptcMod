@@ -1,12 +1,12 @@
 use crate::{
     feature::{
-        custom_note_rendering::CustomNoteRendering,
+        custom_note_rendering::{self, CustomNoteRendering},
         fps_unlock::FPSUnlock,
-        playhead::Playhead,
+        playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
         Feature,
     },
-    patch::hook_post_ret_new,
+    patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -55,20 +55,7 @@ impl PTCVersion for PTC0925 {
         // // pass gen into feature and it could do:
         // let patch = gen::<my_func::<PTC>>();
 
-        unsafe extern "cdecl" fn draw_unit_note_rect(
-            rect: *const libc::c_int,
-            color: libc::c_uint,
-        ) {
-            crate::feature::custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, color);
-        }
-
-        unsafe extern "stdcall" fn draw_unitkb_top_hook() {
-            crate::feature::playhead::draw_unitkb_top::<PTC0925>();
-
-            let fun_00009f80: unsafe extern "stdcall" fn() =
-                std::mem::transmute(addr(0x9f80) as *const ());
-            (fun_00009f80)();
-        }
+        // scroll hook
 
         let unit_clear_hook_patch = hook_post_ret_new!(
             0x165e8,
@@ -78,11 +65,46 @@ impl PTCVersion for PTC0925 {
             scroll_hook::unit_clear::<PTC0925>
         );
 
+        let f_scroll_hook = Scroll::new::<Self>(unit_clear_hook_patch);
+
+        // custom note rendering
+
+        let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
+        let note_rect_hook_patch = replace!(
+            0x1469f,
+            0x1c0e0,
+            "cdecl",
+            fn(rect: *const i32, color: u32),
+            custom_note_rendering::draw_unit_note_rect::<PTC0925>
+        );
+
+        let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
+        let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
+
+        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
+            note_rect_push_ebp,
+            note_rect_hook_patch,
+            note_disable_left_edge,
+            note_disable_right_edge,
+        );
+
+        // playhead
+
+        let draw_unitkb_top_patch = hook_pre_ret_new!(
+            0x166c0,
+            0x9f80,
+            "stdcall",
+            fn(),
+            playhead::draw_unitkb_top::<PTC0925>
+        );
+
+        let f_playhead = Playhead::new::<Self>(draw_unitkb_top_patch);
+
         vec![
             Box::new(FPSUnlock::new::<Self>()),
-            Box::new(Scroll::new::<Self>(unit_clear_hook_patch)),
-            Box::new(CustomNoteRendering::new::<Self>(draw_unit_note_rect)),
-            Box::new(Playhead::new::<Self>(draw_unitkb_top_hook)),
+            Box::new(f_scroll_hook),
+            Box::new(f_custom_note_rendering),
+            Box::new(f_playhead),
         ]
     }
 

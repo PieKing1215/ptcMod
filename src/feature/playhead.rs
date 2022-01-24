@@ -18,20 +18,7 @@ pub struct Playhead {
 }
 
 impl Playhead {
-    pub fn new<PTC: PTCVersion>(draw_unitkb_top_hook: unsafe extern "stdcall" fn()) -> Self {
-        let old_bytes = i32::to_le_bytes(0x9f80 - (0x166c0 + 0x5));
-
-        let new_bytes = i32::to_le_bytes(
-            (draw_unitkb_top_hook as *const () as i64 - (addr(0x166c0) + 0x5) as i64) as i32,
-        );
-
-        let draw_unitkb_top_patch = Patch::new(
-            0x166c0,
-            vec![0xe8, old_bytes[0], old_bytes[1], old_bytes[2], old_bytes[3]],
-            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]],
-        )
-        .unwrap();
-
+    pub fn new<PTC: PTCVersion>(draw_unitkb_top_patch: Patch) -> Self {
         Self { patch: vec![draw_unitkb_top_patch] }
     }
 }
