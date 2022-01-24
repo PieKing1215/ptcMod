@@ -1,6 +1,9 @@
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
-use crate::feature::scroll_hook::Scroll;
+use crate::{
+    feature::scroll_hook::{self, Scroll},
+    patch::hook_post_ret_new,
+};
 
 use super::{addr, PTCVersion};
 
@@ -8,18 +11,15 @@ pub struct PTC09454;
 
 impl PTCVersion for PTC09454 {
     fn get_features() -> Vec<Box<dyn crate::feature::Feature<Self>>> {
-        unsafe extern "cdecl" fn unit_clear_hook(rect: *mut ()) {
-            let unit_clear: unsafe extern "cdecl" fn(rect: *mut ()) =
-                std::mem::transmute(addr(0x78a60) as *const ());
-            (unit_clear)(rect);
-            crate::feature::scroll_hook::unit_clear::<PTC09454>();
-        }
-
-        vec![Box::new(Scroll::new::<Self>(
-            unit_clear_hook as *const (),
+        let unit_clear_hook_patch = hook_post_ret_new!(
             0x79137,
             0x78a60,
-        ))]
+            "cdecl",
+            fn(),
+            scroll_hook::unit_clear::<PTC09454>
+        );
+
+        vec![Box::new(Scroll::new::<Self>(unit_clear_hook_patch))]
     }
 
     fn get_hwnd() -> &'static mut HWND {

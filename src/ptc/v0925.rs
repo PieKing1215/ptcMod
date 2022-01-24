@@ -1,6 +1,12 @@
-use crate::feature::{
-    custom_note_rendering::CustomNoteRendering, fps_unlock::FPSUnlock, playhead::Playhead,
-    scroll_hook::Scroll, Feature,
+use crate::{
+    feature::{
+        custom_note_rendering::CustomNoteRendering,
+        fps_unlock::FPSUnlock,
+        playhead::Playhead,
+        scroll_hook::{self, Scroll},
+        Feature,
+    },
+    patch::hook_post_ret_new,
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -10,15 +16,44 @@ pub struct PTC0925;
 
 impl PTCVersion for PTC0925 {
     fn get_features() -> Vec<Box<dyn Feature<Self>>> {
-        // it is actually possible to move these extern fn definitions into the constructors using generics
-        // however keeping them here is better since the signatures of the hooked functions can change between ptc versions
+        // callbacks involving extern fn are hard to make generic
+        // I've tried like 4 different ways of handling this as well as possible
+        // ideally, I would like to be able to generate a function here that takes a
+        //   callback and outputs a Patch, and then pass this generator fn to the feature
+        // like:
+        // ```
+        // fn gen(callback: fn()) {
+        //     unsafe extern "stdcall" fn unit_clear_hook<const f: usize>() {
+        //         let unit_clear: unsafe extern "stdcall" fn() =
+        //             std::mem::transmute(addr(0x16440) as *const ());
+        //         (unit_clear)();
+        //         (callback)();
+        //     }
+        //     patch::call_patch(0x165e8, 0x16440, unit_clear_hook)
+        // }
+        // let feat = SomeFeature::new(gen);
+        // ```
+        // that doesn't work because a fn can't capture environment, and it cant be a closure because it needs to be extern
+        // I also tried with const generics, but it doesn't work since you can't use a fn as const generic param
+        //   you can't do `<const f: fn()>`
+        //   you can't do `<const f: *const ()>`
+        //   you can do `<const f: usize>`, but you can't do `const p: usize = my_func as usize`
+        // if any of the above worked, it would be possible
+        // as far as I can tell, this is just impossible right now, even on nightly
 
-        unsafe extern "stdcall" fn unit_clear_hook() {
-            let unit_clear: unsafe extern "stdcall" fn() =
-                std::mem::transmute(addr(0x16440) as *const ());
-            (unit_clear)();
-            crate::feature::scroll_hook::unit_clear::<PTC0925>();
-        }
+        // const fn gen<const f: fn()>() {
+        //     unsafe extern "stdcall" fn draw_unitkb_top_hook<const f: usize>() {
+        //         let unit_clear: unsafe extern "stdcall" fn() =
+        //             std::mem::transmute(addr(0x16440) as *const ());
+        //         (unit_clear)();
+
+        //         let myf: fn() =
+        //             std::mem::transmute(f as *const ());
+        //         (myf)();
+        //     }
+        // }
+        // // pass gen into feature and it could do:
+        // let patch = gen::<my_func::<PTC>>();
 
         unsafe extern "cdecl" fn draw_unit_note_rect(
             rect: *const libc::c_int,
@@ -35,13 +70,17 @@ impl PTCVersion for PTC0925 {
             (fun_00009f80)();
         }
 
+        let unit_clear_hook_patch = hook_post_ret_new!(
+            0x165e8,
+            0x16440,
+            "stdcall",
+            fn(),
+            scroll_hook::unit_clear::<PTC0925>
+        );
+
         vec![
             Box::new(FPSUnlock::new::<Self>()),
-            Box::new(Scroll::new::<Self>(
-                unit_clear_hook as *const (),
-                0x165e8,
-                0x16440,
-            )),
+            Box::new(Scroll::new::<Self>(unit_clear_hook_patch)),
             Box::new(CustomNoteRendering::new::<Self>(draw_unit_note_rect)),
             Box::new(Playhead::new::<Self>(draw_unitkb_top_hook)),
         ]

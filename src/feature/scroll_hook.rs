@@ -4,7 +4,7 @@ use winapi::{shared::windef::HMENU, um::winuser};
 
 use crate::{
     patch::Patch,
-    ptc::{addr, PTCVersion},
+    ptc::PTCVersion,
     runtime::{menu_toggle, next_id},
 };
 
@@ -27,24 +27,8 @@ pub struct Scroll {
 }
 
 impl Scroll {
-    pub fn new<PTC: PTCVersion>(
-        unit_clear_hook: *const (),
-        hook_addr: usize,
-        hooked_fn_addr: usize,
-    ) -> Self {
-        let old_bytes = i32::to_le_bytes(hooked_fn_addr as i32 - (hook_addr + 0x5) as i32);
-
-        let new_bytes =
-            i32::to_le_bytes((unit_clear_hook as i64 - (addr(hook_addr) + 0x5) as i64) as i32);
-
-        let clear_notes_hook_patch = Patch::new(
-            hook_addr,
-            vec![0xe8, old_bytes[0], old_bytes[1], old_bytes[2], old_bytes[3]],
-            vec![0xe8, new_bytes[0], new_bytes[1], new_bytes[2], new_bytes[3]],
-        )
-        .unwrap();
-
-        Self { patch: vec![clear_notes_hook_patch] }
+    pub fn new<PTC: PTCVersion>(unit_clear_hook_patch: Patch) -> Self {
+        Self { patch: vec![unit_clear_hook_patch] }
     }
 }
 
