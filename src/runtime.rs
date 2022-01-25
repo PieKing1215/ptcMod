@@ -1,4 +1,4 @@
-use std::{cell::Cell, convert::TryInto, sync::mpsc::Sender};
+use std::{convert::TryInto, sync::mpsc::Sender};
 
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
@@ -10,49 +10,11 @@ use winapi::{
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
 const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
-use crate::{feature::Feature, ptc::PTCVersion};
-
-// system for assigning globally unique menu ids without hardcoded constants
-static mut MENU_ID_COUNTER: Cell<u16> = Cell::new(1000);
-
-pub(crate) fn next_id() -> u16 {
-    unsafe {
-        MENU_ID_COUNTER.set(MENU_ID_COUNTER.get() + 1);
-        MENU_ID_COUNTER.get()
-    }
-}
+use crate::{feature::Feature, ptc::PTCVersion, winutil};
 
 lazy_static::lazy_static! {
-    static ref M_ABOUT_ID: u16 = next_id();
-    static ref M_UNINJECT_ID: u16 = next_id();
-}
-
-/// Handles toggling the state of a menu toggle
-/// Returns true if the menu is now checked
-pub(crate) fn menu_toggle(hwnd: HWND, id: impl Into<u32>) -> bool {
-    let id = id.into();
-    unsafe {
-        if winuser::GetMenuState(winuser::GetMenu(hwnd), id, winuser::MF_BYCOMMAND)
-            & winuser::MF_CHECKED
-            > 0
-        {
-            winuser::CheckMenuItem(
-                winuser::GetMenu(hwnd),
-                id,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
-            false
-        } else {
-            winuser::CheckMenuItem(
-                winuser::GetMenu(hwnd),
-                id,
-                winuser::MF_BYCOMMAND | winuser::MF_CHECKED,
-            );
-
-            true
-        }
-    }
+    static ref M_ABOUT_ID: u16 = winutil::next_id();
+    static ref M_UNINJECT_ID: u16 = winutil::next_id();
 }
 
 enum MsgType {
@@ -82,6 +44,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
     }
 
     #[allow(clippy::too_many_lines)] // TODO
+    #[allow(clippy::unnecessary_wraps)]
     pub fn main(&mut self) -> anyhow::Result<()> {
         CombinedLogger::init(vec![TermLogger::new(
             LevelFilter::Debug,

@@ -4,16 +4,16 @@ use winapi::{shared::windef::HMENU, um::winuser};
 use crate::{
     patch::Patch,
     ptc::{addr, PTCVersion},
-    runtime::{menu_toggle, next_id},
+    winutil,
 };
 
 use super::{scroll_hook, Feature};
 
 lazy_static::lazy_static! {
-    static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = next_id();
-    static ref M_NOTE_PULSE_ID: u16 = next_id();
-    static ref M_VOLUME_FADE_ID: u16 = next_id();
-    static ref M_COLORED_UNITS_ID: u16 = next_id();
+    static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = winutil::next_id();
+    static ref M_NOTE_PULSE_ID: u16 = winutil::next_id();
+    static ref M_VOLUME_FADE_ID: u16 = winutil::next_id();
+    static ref M_COLORED_UNITS_ID: u16 = winutil::next_id();
 }
 
 // store our own values instead since calling winapi in the draw loop would be slow
@@ -56,94 +56,16 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 l_title.as_ptr().cast::<i8>(),
             );
 
-            let l_title: Vec<u8> = "Enabled\0".bytes().collect();
-            winuser::AppendMenuA(
+            winutil::add_menu_toggle(menu, "Enabled", *M_CUSTOM_RENDERING_ENABLED_ID, false, true);
+            winutil::add_menu_toggle(
                 menu,
-                winuser::MF_CHECKED,
-                *M_CUSTOM_RENDERING_ENABLED_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
+                "Colored Units",
+                *M_COLORED_UNITS_ID,
+                COLORED_UNITS,
+                false,
             );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_CUSTOM_RENDERING_ENABLED_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
-            let l_title: Vec<u8> = "Colored Units\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_COLORED_UNITS_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_COLORED_UNITS_ID as u32,
-                winuser::MF_BYCOMMAND
-                    | if VOLUME_FADE {
-                        winuser::MF_CHECKED
-                    } else {
-                        winuser::MF_UNCHECKED
-                    },
-            );
-
-            winuser::EnableMenuItem(
-                menu,
-                *M_COLORED_UNITS_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-            );
-
-            let l_title: Vec<u8> = "Volume Fade\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_VOLUME_FADE_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_VOLUME_FADE_ID as u32,
-                winuser::MF_BYCOMMAND
-                    | if VOLUME_FADE {
-                        winuser::MF_CHECKED
-                    } else {
-                        winuser::MF_UNCHECKED
-                    },
-            );
-
-            winuser::EnableMenuItem(
-                menu,
-                *M_VOLUME_FADE_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-            );
-
-            let l_title: Vec<u8> = "Note Pulse\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_NOTE_PULSE_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_NOTE_PULSE_ID as u32,
-                winuser::MF_BYCOMMAND
-                    | if NOTE_PULSE {
-                        winuser::MF_CHECKED
-                    } else {
-                        winuser::MF_UNCHECKED
-                    },
-            );
-
-            winuser::EnableMenuItem(
-                menu,
-                *M_NOTE_PULSE_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-            );
+            winutil::add_menu_toggle(menu, "Volume Fade", *M_VOLUME_FADE_ID, VOLUME_FADE, false);
+            winutil::add_menu_toggle(menu, "Note Pulse", *M_NOTE_PULSE_ID, NOTE_PULSE, false);
         }
     }
 
@@ -171,99 +93,51 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             #[allow(clippy::collapsible_if)]
             if high == 0 {
                 if low == *M_CUSTOM_RENDERING_ENABLED_ID {
-                    if menu_toggle(msg.hwnd, *M_CUSTOM_RENDERING_ENABLED_ID) {
+                    if winutil::menu_toggle(msg.hwnd, *M_CUSTOM_RENDERING_ENABLED_ID) {
                         for p in &self.note_draw_patch {
                             unsafe { p.apply() }.unwrap();
                         }
 
                         unsafe {
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_NOTE_PULSE_ID as u32,
-                                winuser::MF_BYCOMMAND
-                                    | if scroll_hook::ENABLED {
-                                        winuser::MF_ENABLED
-                                    } else {
-                                        winuser::MF_GRAYED
-                                    },
-                            );
-
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_VOLUME_FADE_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
-                            );
-
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_COLORED_UNITS_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
+                            winutil::set_menu_enabled(
+                                msg.hwnd,
+                                *M_NOTE_PULSE_ID,
+                                scroll_hook::ENABLED,
                             );
                         }
+                        winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, true);
+                        winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, true);
                     } else {
                         for p in &self.note_draw_patch {
                             unsafe { p.unapply() }.unwrap();
                         }
 
-                        unsafe {
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_NOTE_PULSE_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-                            );
-
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_VOLUME_FADE_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-                            );
-
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_COLORED_UNITS_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-                            );
-                        }
+                        winutil::set_menu_enabled(msg.hwnd, *M_NOTE_PULSE_ID, false);
+                        winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
+                        winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, false);
                     }
                 } else if low == *M_NOTE_PULSE_ID {
                     unsafe {
-                        NOTE_PULSE = menu_toggle(msg.hwnd, *M_NOTE_PULSE_ID);
+                        NOTE_PULSE = winutil::menu_toggle(msg.hwnd, *M_NOTE_PULSE_ID);
                     }
                 } else if low == *M_VOLUME_FADE_ID {
                     unsafe {
-                        VOLUME_FADE = menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
+                        VOLUME_FADE = winutil::menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
                     }
                 } else if low == *M_COLORED_UNITS_ID {
                     unsafe {
-                        COLORED_UNITS = menu_toggle(msg.hwnd, *M_COLORED_UNITS_ID);
+                        COLORED_UNITS = winutil::menu_toggle(msg.hwnd, *M_COLORED_UNITS_ID);
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
-                    unsafe {
-                        let scroll_hook_enabled = winuser::GetMenuState(
-                            winuser::GetMenu(*PTC::get_hwnd()),
-                            (*scroll_hook::M_SCROLL_HOOK_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND,
-                        ) & winuser::MF_CHECKED
-                            > 0;
-
-                        let custom_rendering_enabled = winuser::GetMenuState(
-                            winuser::GetMenu(*PTC::get_hwnd()),
-                            (*M_CUSTOM_RENDERING_ENABLED_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND,
-                        ) & winuser::MF_CHECKED
-                            > 0;
-
-                        winuser::EnableMenuItem(
-                            winuser::GetMenu(msg.hwnd),
-                            *M_NOTE_PULSE_ID as u32,
-                            winuser::MF_BYCOMMAND
-                                | if scroll_hook_enabled && custom_rendering_enabled {
-                                    winuser::MF_ENABLED
-                                } else {
-                                    winuser::MF_GRAYED
-                                },
-                        );
-                    }
+                    let scroll_hook_enabled =
+                        winutil::get_menu_checked(*PTC::get_hwnd(), *scroll_hook::M_SCROLL_HOOK_ID);
+                    let custom_rendering_enabled =
+                        winutil::get_menu_checked(*PTC::get_hwnd(), *M_CUSTOM_RENDERING_ENABLED_ID);
+                    winutil::set_menu_enabled(
+                        msg.hwnd,
+                        *M_NOTE_PULSE_ID,
+                        scroll_hook_enabled && custom_rendering_enabled,
+                    );
                 }
             }
         }

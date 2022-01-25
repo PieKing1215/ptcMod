@@ -3,13 +3,13 @@ use winapi::{shared::windef::HMENU, um::winuser};
 use crate::{
     patch::Patch,
     ptc::{addr, PTCVersion},
-    runtime::{menu_toggle, next_id},
+    winutil,
 };
 
 use super::Feature;
 
 lazy_static::lazy_static! {
-    static ref M_FPS_UNLOCK_ID: u16 = next_id();
+    static ref M_FPS_UNLOCK_ID: u16 = winutil::next_id();
 }
 
 pub struct FPSUnlock {
@@ -35,21 +35,7 @@ impl FPSUnlock {
 
 impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
     fn init(&mut self, menu: HMENU) {
-        unsafe {
-            let l_title: Vec<u8> = "FPS Unlock\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_FPS_UNLOCK_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_FPS_UNLOCK_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-        }
+        winutil::add_menu_toggle(menu, "FPS Unlock", *M_FPS_UNLOCK_ID, false, true);
     }
 
     fn cleanup(&mut self) {
@@ -73,7 +59,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
             #[allow(clippy::collapsible_if)]
             if high == 0 {
                 if low == *M_FPS_UNLOCK_ID {
-                    if menu_toggle(msg.hwnd, *M_FPS_UNLOCK_ID) {
+                    if winutil::menu_toggle(msg.hwnd, *M_FPS_UNLOCK_ID) {
                         for p in &self.patch {
                             unsafe { p.apply() }.unwrap();
                         }

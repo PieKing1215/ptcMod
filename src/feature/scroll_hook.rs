@@ -2,17 +2,13 @@ use std::time::Instant;
 
 use winapi::{shared::windef::HMENU, um::winuser};
 
-use crate::{
-    patch::Patch,
-    ptc::PTCVersion,
-    runtime::{menu_toggle, next_id},
-};
+use crate::{patch::Patch, ptc::PTCVersion, winutil};
 
 use super::Feature;
 
 lazy_static::lazy_static! {
-    pub(crate) static ref M_SCROLL_HOOK_ID: u16 = next_id();
-    pub(crate) static ref M_SMOOTH_SCROLL_ID: u16 = next_id();
+    pub(crate) static ref M_SCROLL_HOOK_ID: u16 = winutil::next_id();
+    pub(crate) static ref M_SMOOTH_SCROLL_ID: u16 = winutil::next_id();
 }
 
 pub(crate) static mut ENABLED: bool = false;
@@ -34,41 +30,8 @@ impl Scroll {
 
 impl<PTC: PTCVersion> Feature<PTC> for Scroll {
     fn init(&mut self, menu: HMENU) {
-        unsafe {
-            let l_title: Vec<u8> = "Scroll Hook\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_SCROLL_HOOK_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_SCROLL_HOOK_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
-            let l_title: Vec<u8> = "Smooth Scroll\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_SMOOTH_SCROLL_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_SMOOTH_SCROLL_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
-            winuser::EnableMenuItem(
-                menu,
-                *M_SMOOTH_SCROLL_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-            );
-        }
+        winutil::add_menu_toggle(menu, "Scroll Hook", *M_SCROLL_HOOK_ID, false, true);
+        winutil::add_menu_toggle(menu, "Smooth Scroll", *M_SMOOTH_SCROLL_ID, false, false);
     }
 
     fn cleanup(&mut self) {
@@ -89,18 +52,14 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
             #[allow(clippy::collapsible_if)]
             if high == 0 {
                 if low == *M_SCROLL_HOOK_ID {
-                    if menu_toggle(msg.hwnd, *M_SCROLL_HOOK_ID) {
+                    if winutil::menu_toggle(msg.hwnd, *M_SCROLL_HOOK_ID) {
                         for p in &self.patch {
                             unsafe { p.apply() }.unwrap();
                         }
 
-                        unsafe {
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_SMOOTH_SCROLL_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_ENABLED,
-                            );
+                        winutil::set_menu_enabled(*PTC::get_hwnd(), *M_SMOOTH_SCROLL_ID, true);
 
+                        unsafe {
                             ENABLED = true;
 
                             winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
@@ -110,18 +69,13 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
                             unsafe { p.unapply() }.unwrap();
                         }
 
+                        winutil::set_menu_enabled(*PTC::get_hwnd(), *M_SMOOTH_SCROLL_ID, false);
                         unsafe {
-                            winuser::EnableMenuItem(
-                                winuser::GetMenu(msg.hwnd),
-                                *M_SMOOTH_SCROLL_ID as u32,
-                                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-                            );
-
                             ENABLED = false;
                         }
                     }
                 } else if low == *M_SMOOTH_SCROLL_ID {
-                    menu_toggle(msg.hwnd, *M_SMOOTH_SCROLL_ID);
+                    winutil::menu_toggle(msg.hwnd, *M_SMOOTH_SCROLL_ID);
                 }
             }
         }
@@ -133,12 +87,7 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
 
     if PTC::is_playing() {
         {
-            let smooth = winuser::GetMenuState(
-                winuser::GetMenu(*PTC::get_hwnd()),
-                (*M_SMOOTH_SCROLL_ID).try_into().unwrap(),
-                winuser::MF_BYCOMMAND,
-            ) & winuser::MF_CHECKED
-                > 0;
+            let smooth = winutil::get_menu_checked(*PTC::get_hwnd(), *M_SMOOTH_SCROLL_ID);
 
             let mut play_pos =
                 *PTC::get_play_pos() / PTC::get_buffer_size() * PTC::get_buffer_size();

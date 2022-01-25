@@ -29,7 +29,8 @@ compile_error!("this is extremely windows dependent");
 mod feature;
 mod patch;
 mod ptc;
-pub mod runtime;
+mod runtime;
+mod winutil;
 
 #[allow(clippy::too_many_lines)] // TODO
 fn attach() -> anyhow::Result<()> {

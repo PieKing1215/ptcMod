@@ -1,16 +1,11 @@
 use winapi::{shared::windef::HMENU, um::winuser};
 
-use crate::{
-    feature::scroll_hook,
-    patch::Patch,
-    ptc::{addr, PTCVersion},
-    runtime::{menu_toggle, next_id},
-};
+use crate::{feature::scroll_hook, patch::Patch, ptc::PTCVersion, winutil};
 
 use super::Feature;
 
 lazy_static::lazy_static! {
-    static ref M_PLAYHEAD_ID: u16 = next_id();
+    static ref M_PLAYHEAD_ID: u16 = winutil::next_id();
 }
 
 pub struct Playhead {
@@ -25,27 +20,7 @@ impl Playhead {
 
 impl<PTC: PTCVersion> Feature<PTC> for Playhead {
     fn init(&mut self, menu: HMENU) {
-        unsafe {
-            let l_title: Vec<u8> = "Playhead\0".bytes().collect();
-            winuser::AppendMenuA(
-                menu,
-                winuser::MF_CHECKED,
-                *M_PLAYHEAD_ID as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
-
-            winuser::CheckMenuItem(
-                menu,
-                *M_PLAYHEAD_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_UNCHECKED,
-            );
-
-            winuser::EnableMenuItem(
-                menu,
-                *M_PLAYHEAD_ID as u32,
-                winuser::MF_BYCOMMAND | winuser::MF_GRAYED,
-            );
-        }
+        winutil::add_menu_toggle(menu, "Playhead", *M_PLAYHEAD_ID, false, false);
     }
 
     fn cleanup(&mut self) {
@@ -66,7 +41,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
             #[allow(clippy::collapsible_if)]
             if high == 0 {
                 if low == *M_PLAYHEAD_ID {
-                    if menu_toggle(msg.hwnd, *M_PLAYHEAD_ID) {
+                    if winutil::menu_toggle(msg.hwnd, *M_PLAYHEAD_ID) {
                         for p in &self.patch {
                             unsafe { p.apply() }.unwrap();
                         }
@@ -76,25 +51,13 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
                         }
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
-                    unsafe {
-                        let enabled = winuser::GetMenuState(
-                            winuser::GetMenu(*PTC::get_hwnd()),
-                            (*scroll_hook::M_SCROLL_HOOK_ID).try_into().unwrap(),
-                            winuser::MF_BYCOMMAND,
-                        ) & winuser::MF_CHECKED
-                            > 0;
-
-                        winuser::EnableMenuItem(
-                            winuser::GetMenu(*PTC::get_hwnd()),
-                            *M_PLAYHEAD_ID as u32,
-                            winuser::MF_BYCOMMAND
-                                | if enabled {
-                                    winuser::MF_ENABLED
-                                } else {
-                                    winuser::MF_GRAYED
-                                },
-                        );
-                    }
+                    let scroll_hook_enabled =
+                        winutil::get_menu_checked(*PTC::get_hwnd(), *scroll_hook::M_SCROLL_HOOK_ID);
+                    winutil::set_menu_enabled(
+                        *PTC::get_hwnd(),
+                        *M_PLAYHEAD_ID,
+                        scroll_hook_enabled,
+                    );
                 }
             }
         }
