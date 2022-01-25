@@ -238,4 +238,13 @@ impl PTCVersion for PTC0925 {
     fn get_about_dialog_text_ids() -> (i32, i32, i32, i32) {
         (0x3f6, 0x43a, 0x40c, 0x3ea)
     }
+
+    fn draw_rect(rect: [i32; 4], color: u32) {
+        unsafe {
+            let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =
+                std::mem::transmute(addr(0x1c0e0) as *const ());
+            (draw_rect)(rect.as_ptr(), color);
+        }
+    }
+    
 }

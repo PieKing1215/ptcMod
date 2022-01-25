@@ -31,6 +31,7 @@ pub trait PTCVersion {
     fn center_window(hwnd: HWND);
     fn about_dlg_fn_2(hwnd: HWND);
     fn get_about_dialog_text_ids() -> (i32, i32, i32, i32);
+    fn draw_rect(rect: [i32; 4], color: u32);
 }
 
 pub fn addr(relative: usize) -> usize {

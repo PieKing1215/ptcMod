@@ -159,4 +159,8 @@ impl PTCVersion for PTC09454 {
     fn get_about_dialog_text_ids() -> (i32, i32, i32, i32) {
         (0x3f6, 0x439, 0x40b, 0x3ea)
     }
+
+    fn draw_rect(rect: [i32; 4], color: u32) {
+        todo!()
+    }
 }
