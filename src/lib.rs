@@ -10,6 +10,9 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::missing_safety_doc)]
+// __thiscall calling convention is nightly only
+// Tracking issue: https://github.com/rust-lang/rust/issues/42202
+#![feature(abi_thiscall)]
 
 use std::convert::TryInto;
 

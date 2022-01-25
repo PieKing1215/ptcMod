@@ -1,8 +1,11 @@
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::{
-    feature::scroll_hook::{self, Scroll},
-    patch::hook,
+    feature::{
+        playhead::{self, Playhead},
+        scroll_hook::{self, Scroll},
+    },
+    patch::{hook, hook_pre_ret_new},
 };
 
 use super::{addr, PTCVersion};
@@ -11,12 +14,28 @@ pub struct PTC09454;
 
 impl PTCVersion for PTC09454 {
     fn get_features() -> Vec<Box<dyn crate::feature::Feature<Self>>> {
+        // scroll hook
+
         let unit_clear_hook_patch =
             hook!(0x7920a, 0x78a60, "cdecl", fn(a: *mut f32), |_old_fn, _a| {
-                scroll_hook::unit_clear::<PTC09454>()
+                scroll_hook::unit_clear::<PTC09454>();
             });
 
-        vec![Box::new(Scroll::new::<Self>(unit_clear_hook_patch))]
+        let f_scroll_hook = Scroll::new::<Self>(unit_clear_hook_patch);
+
+        // playhead
+
+        let draw_unitkb_top_patch = hook_pre_ret_new!(
+            0x79331,
+            0x62080,
+            "stdcall",
+            fn(),
+            playhead::draw_unitkb_top::<PTC09454>
+        );
+
+        let f_playhead = Playhead::new::<Self>(draw_unitkb_top_patch);
+
+        vec![Box::new(f_scroll_hook), Box::new(f_playhead)]
     }
 
     fn get_hwnd() -> &'static mut HWND {
@@ -158,6 +177,23 @@ impl PTCVersion for PTC09454 {
     }
 
     fn draw_rect(rect: [i32; 4], color: u32) {
-        todo!()
+        unsafe {
+            let draw_rect: unsafe extern "thiscall" fn(
+                this: *mut (),
+                rect: *const f32,
+                color: libc::c_uint,
+            ) = std::mem::transmute(addr(0x7570) as *const ());
+            let f_rect = [
+                rect[0] as f32,
+                rect[1] as f32,
+                rect[2] as f32,
+                rect[3] as f32,
+            ];
+            (draw_rect)(
+                *(addr(0xbe03c) as *mut usize) as *mut (),
+                f_rect.as_ptr(),
+                color,
+            );
+        }
     }
 }

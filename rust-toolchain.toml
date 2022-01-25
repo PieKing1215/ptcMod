@@ -1,2 +1,2 @@
 [toolchain]
-channel = "stable-i686-pc-windows-gnu"
+channel = "nightly-i686-pc-windows-gnu"
