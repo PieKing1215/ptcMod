@@ -78,8 +78,21 @@ impl PTCVersion for PTC0925 {
             custom_note_rendering::draw_unit_note_rect::<PTC0925>
         );
 
-        let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
-        let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
+        // first set here changes the spritesheet to empty, second NOPs the draw_image call completely
+        // let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
+        // let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
+        let note_disable_left_edge = Patch::new(
+            0x146ca,
+            vec![0xe8, 0xa1, 0x77, 0x00, 0x00],
+            vec![0x90, 0x90, 0x90, 0x90, 0x90],
+        )
+        .unwrap();
+        let note_disable_right_edge = Patch::new(
+            0x146f9,
+            vec![0xe8, 0x72, 0x77, 0x00, 0x00],
+            vec![0x90, 0x90, 0x90, 0x90, 0x90],
+        )
+        .unwrap();
 
         let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
             note_rect_push_ebp,
