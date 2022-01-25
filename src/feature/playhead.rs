@@ -55,9 +55,6 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
                     log::warn!("note_rect_hook_patch: {:?}", e);
                 }
             }
-
-            // set wait time to tick time (otherwise it waits for it to catch up)
-            *(addr(0xa6fa4) as *mut u32) = *(addr(0xa6fa0) as *mut u32);
         }
     }
 
