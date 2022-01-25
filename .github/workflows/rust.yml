@@ -19,7 +19,7 @@ jobs:
     - name: Setup
       run: |
         rustup target add i686-pc-windows-gnu
-        rustup toolchain install stable-i686-pc-windows-gnu
+        rustup toolchain install nightly-i686-pc-windows-gnu
 
     - name: Build
       run: cargo build --release --verbose
