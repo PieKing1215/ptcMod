@@ -246,5 +246,4 @@ impl PTCVersion for PTC0925 {
             (draw_rect)(rect.as_ptr(), color);
         }
     }
-    
 }
