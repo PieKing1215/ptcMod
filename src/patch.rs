@@ -63,7 +63,7 @@ impl Patch {
         log::debug!(
             "Patching @ {:#x} (unapply). Expect {:x?} found {:x?}",
             self.addr,
-            self.old,
+            self.new,
             mem
         );
         if self.new == mem {
