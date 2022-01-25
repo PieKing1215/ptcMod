@@ -2,7 +2,7 @@ use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::{
     feature::scroll_hook::{self, Scroll},
-    patch::hook_post_ret_new,
+    patch::hook,
 };
 
 use super::{addr, PTCVersion};
@@ -11,13 +11,10 @@ pub struct PTC09454;
 
 impl PTCVersion for PTC09454 {
     fn get_features() -> Vec<Box<dyn crate::feature::Feature<Self>>> {
-        let unit_clear_hook_patch = hook_post_ret_new!(
-            0x79137,
-            0x78a60,
-            "cdecl",
-            fn(),
-            scroll_hook::unit_clear::<PTC09454>
-        );
+        let unit_clear_hook_patch =
+            hook!(0x7920a, 0x78a60, "cdecl", fn(a: *mut f32), |_old_fn, _a| {
+                scroll_hook::unit_clear::<PTC09454>()
+            });
 
         vec![Box::new(Scroll::new::<Self>(unit_clear_hook_patch))]
     }
