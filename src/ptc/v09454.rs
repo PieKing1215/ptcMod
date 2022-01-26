@@ -2,13 +2,14 @@ use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::{
     feature::{
+        custom_note_rendering::{self, CustomNoteRendering},
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{hook, hook_pre_ret_new},
+    patch::{hook, hook_pre_ret_new, Patch},
 };
 
-use super::{addr, PTCVersion};
+use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion};
 
 pub struct PTC09454;
 
@@ -23,6 +24,48 @@ impl PTCVersion for PTC09454 {
 
         let f_scroll_hook = Scroll::new::<Self>(unit_clear_hook_patch);
 
+        // custom note rendering
+
+        let note_rect_push_ebp = Patch::new(0x74cb7, vec![0x51], vec![0x55]).unwrap();
+        let note_rect_hook_patch = hook!(
+            0x74cc5,
+            0x7570,
+            "thiscall",
+            fn(this: *mut (), rect: *const [f32; 4], ebp: u32),
+            |_old_fn, _this, rect: *const [f32; 4], ebp| {
+                let not_focused = *((ebp - 0xbc) as *mut u32) != 0;
+                let unit = *((ebp - 0xcc) as *mut u32);
+                // let not_focused = false;
+                // let unit = 3;
+                let rect = [
+                    (*rect)[0] as i32,
+                    (*rect)[1] as i32,
+                    (*rect)[2] as i32,
+                    (*rect)[3] as i32,
+                ];
+                custom_note_rendering::draw_unit_note_rect::<PTC09454>(
+                    rect.as_ptr(),
+                    unit,
+                    not_focused,
+                );
+            }
+        );
+
+        // for some reason NOPing the draw_image call directly crashes unlike in 0.9.2.5
+        // instead, this changes the conditional jumps around the draw_image calls into unconditional jumps
+        // so the draw_image is skipped
+        let note_disable_left_edge =
+            Patch::new(0x74ce2, vec![0x72, 0x3e], vec![0xeb, 0x3e]).unwrap();
+        let note_disable_right_edge =
+            Patch::new(0x74d31, vec![0x76, 0x41], vec![0xeb, 0x41]).unwrap();
+
+        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
+            note_rect_push_ebp,
+            note_rect_hook_patch,
+            note_disable_left_edge,
+            note_disable_right_edge,
+        );
+
         // playhead
 
         let draw_unitkb_top_patch = hook_pre_ret_new!(
@@ -35,7 +78,11 @@ impl PTCVersion for PTC09454 {
 
         let f_playhead = Playhead::new::<Self>(draw_unitkb_top_patch);
 
-        vec![Box::new(f_scroll_hook), Box::new(f_playhead)]
+        vec![
+            Box::new(f_scroll_hook),
+            Box::new(f_custom_note_rendering),
+            Box::new(f_playhead),
+        ]
     }
 
     fn get_hwnd() -> &'static mut HWND {
@@ -189,11 +236,30 @@ impl PTCVersion for PTC09454 {
                 rect[2] as f32,
                 rect[3] as f32,
             ];
+            let color = color_argb_to_abgr(color);
             (draw_rect)(
                 *(addr(0xbe03c) as *mut usize) as *mut (),
                 f_rect.as_ptr(),
                 color,
             );
+        }
+    }
+
+    fn get_base_note_colors_argb() -> [u32; 2] {
+        unsafe {
+            let abgr = *(addr(0xbd6b0) as *mut [u32; 2]);
+            [color_abgr_to_argb(abgr[0]), color_abgr_to_argb(abgr[1])]
+        }
+    }
+
+    fn get_event_value_at_screen_pos(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 {
+        unsafe {
+            let get_event_value: unsafe extern "cdecl" fn(
+                pos_x: f32,
+                unit_no: i32,
+                ev_type: i32,
+            ) -> i32 = std::mem::transmute(addr(0x601c0) as *const ());
+            (get_event_value)(pos_x as f32, unit_no, ev_type)
         }
     }
 }

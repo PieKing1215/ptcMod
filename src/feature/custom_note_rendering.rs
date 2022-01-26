@@ -1,11 +1,7 @@
 use colorsys::ColorTransform;
 use winapi::{shared::windef::HMENU, um::winuser};
 
-use crate::{
-    patch::Patch,
-    ptc::{addr, PTCVersion},
-    winutil,
-};
+use crate::{patch::Patch, ptc::PTCVersion, winutil};
 
 use super::{scroll_hook, Feature};
 
@@ -149,17 +145,14 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 #[allow(clippy::too_many_lines)] // TODO
 pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     rect: *const libc::c_int,
-    ebp: libc::c_uint,
+    unit: u32,
+    not_focused: bool,
 ) {
     // color = 0x0094FF;
 
-    let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
-
-    let color = &*(addr(0xa6cb4 + if not_focused { 0x4 } else { 0 }) as *mut u32);
+    let color = PTC::get_base_note_colors_argb()[if not_focused { 1 } else { 0 }];
     let raw_argb = color.to_be_bytes();
     let mut rgb = colorsys::Rgb::from([raw_argb[1], raw_argb[2], raw_argb[3]]);
-
-    let unit = *((ebp - 0x80) as *mut u32);
 
     if COLORED_UNITS {
         rgb.adjust_hue(unit as f64 * 25.0);
@@ -184,18 +177,18 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 }
 
                 if VOLUME_FADE {
-                    let get_event_value: unsafe extern "cdecl" fn(
-                        pos_x: i32,
-                        unit_no: i32,
-                        ev_type: i32,
-                    ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-
-                    let volume: f32 =
-                        (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
-                            / 104.0;
-                    let velocity: f32 =
-                        (get_event_value)(scroll_hook::LAST_PLAYHEAD_POS, unit as i32, 0x5) as f32
-                            / 104.0;
+                    let volume: f32 = PTC::get_event_value_at_screen_pos(
+                        scroll_hook::LAST_PLAYHEAD_POS,
+                        unit as i32,
+                        0x5,
+                    ) as f32
+                        / 104.0;
+                    let velocity: f32 = PTC::get_event_value_at_screen_pos(
+                        scroll_hook::LAST_PLAYHEAD_POS,
+                        unit as i32,
+                        0x5,
+                    ) as f32
+                        / 104.0;
 
                     let factor = volume * velocity;
                     let factor = factor.powf(0.25);
@@ -227,14 +220,12 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 }
 
                 if VOLUME_FADE {
-                    let get_event_value: unsafe extern "cdecl" fn(
-                        pos_x: i32,
-                        unit_no: i32,
-                        ev_type: i32,
-                    ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-
-                    let volume: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
-                    let velocity: f32 = (get_event_value)(rect[2], unit as i32, 0x5) as f32 / 104.0;
+                    let volume: f32 = PTC::get_event_value_at_screen_pos(rect[2], unit as i32, 0x5)
+                        as f32
+                        / 104.0;
+                    let velocity: f32 =
+                        PTC::get_event_value_at_screen_pos(rect[2], unit as i32, 0x5) as f32
+                            / 104.0;
 
                     let factor = volume * velocity;
                     let factor = factor.powf(0.25);
@@ -261,14 +252,10 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
             }
             .to_be_bytes();
 
-            let get_event_value: unsafe extern "cdecl" fn(
-                pos_x: i32,
-                unit_no: i32,
-                ev_type: i32,
-            ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
-
-            let volume: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 104.0;
-            let velocity: f32 = (get_event_value)(rect[0], unit as i32, 0x5) as f32 / 104.0;
+            let volume: f32 =
+                PTC::get_event_value_at_screen_pos(rect[0], unit as i32, 0x5) as f32 / 104.0;
+            let velocity: f32 =
+                PTC::get_event_value_at_screen_pos(rect[0], unit as i32, 0x5) as f32 / 104.0;
 
             let factor = volume * velocity;
             let factor = factor.powf(0.25);
@@ -282,7 +269,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
     let rgb_arr: [u8; 3] = rgb.into();
 
-    let color = u32::from_be_bytes([0, rgb_arr[0], rgb_arr[1], rgb_arr[2]]);
+    let color = u32::from_be_bytes([0xff, rgb_arr[0], rgb_arr[1], rgb_arr[2]]);
 
     // left edge
     PTC::draw_rect([rect[0], rect[1], rect[2], rect[3]], color);

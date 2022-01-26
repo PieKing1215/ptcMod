@@ -6,7 +6,7 @@ use crate::{
         scroll_hook::{self, Scroll},
         Feature,
     },
-    patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
+    patch::{hook, hook_post_ret_new, hook_pre_ret_new, Patch},
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -70,12 +70,16 @@ impl PTCVersion for PTC0925 {
         // custom note rendering
 
         let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
-        let note_rect_hook_patch = replace!(
+        let note_rect_hook_patch = hook!(
             0x1469f,
             0x1c0e0,
             "cdecl",
-            fn(rect: *const i32, color: u32),
-            custom_note_rendering::draw_unit_note_rect::<PTC0925>
+            fn(rect: *const i32, ebp: u32),
+            |_old_fn, rect, ebp| {
+                let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
+                let unit = *((ebp - 0x80) as *mut u32);
+                custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, unit, not_focused);
+            }
         );
 
         // first set here changes the spritesheet to empty, second NOPs the draw_image call completely
@@ -257,6 +261,21 @@ impl PTCVersion for PTC0925 {
             let draw_rect: unsafe extern "cdecl" fn(rect: *const libc::c_int, color: libc::c_uint) =
                 std::mem::transmute(addr(0x1c0e0) as *const ());
             (draw_rect)(rect.as_ptr(), color);
+        }
+    }
+
+    fn get_base_note_colors_argb() -> [u32; 2] {
+        unsafe { *(addr(0xa6cb4) as *mut [u32; 2]) }
+    }
+
+    fn get_event_value_at_screen_pos(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 {
+        unsafe {
+            let get_event_value: unsafe extern "cdecl" fn(
+                pos_x: i32,
+                unit_no: i32,
+                ev_type: i32,
+            ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
+            (get_event_value)(pos_x, unit_no, ev_type)
         }
     }
 }
