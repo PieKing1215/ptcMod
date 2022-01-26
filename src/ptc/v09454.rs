@@ -3,6 +3,7 @@ use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 use crate::{
     feature::{
         custom_note_rendering::{self, CustomNoteRendering},
+        drag_and_drop::DragAndDrop,
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
@@ -82,6 +83,7 @@ impl PTCVersion for PTC09454 {
             Box::new(f_scroll_hook),
             Box::new(f_custom_note_rendering),
             Box::new(f_playhead),
+            Box::new(DragAndDrop::new::<Self>()),
         ]
     }
 

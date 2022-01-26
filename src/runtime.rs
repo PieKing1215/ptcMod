@@ -1,10 +1,14 @@
-use std::{convert::TryInto, sync::mpsc::Sender};
+use std::{convert::TryInto, mem::MaybeUninit, sync::mpsc::Sender};
 
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 use winapi::{
     shared::windef::HWND,
-    um::{libloaderapi::GetModuleHandleA, winuser},
+    um::{
+        libloaderapi::GetModuleHandleA,
+        synchapi::Sleep,
+        winuser::{self, DispatchMessageA, PeekMessageA, TranslateMessage},
+    },
 };
 
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
@@ -136,12 +140,35 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
             // block for signals from windows
             loop {
-                let v = rx.recv().unwrap();
-                match v {
-                    MsgType::Uninject => break,
-                    MsgType::WinMsg(msg) => {
-                        self.on_win_msg(msg);
+                let mut did_something = false;
+
+                if let Ok(v) = rx.try_recv() {
+                    did_something = true;
+                    match v {
+                        MsgType::Uninject => break,
+                        MsgType::WinMsg(msg) => {
+                            self.on_win_msg(msg);
+                        }
                     }
+                }
+
+                // we need to pump on our thread since drag/drop needs to be done on this thread
+                let mut msg = MaybeUninit::<winuser::MSG>::uninit();
+                if PeekMessageA(
+                    msg.as_mut_ptr(),
+                    std::ptr::null_mut(),
+                    0,
+                    0,
+                    winuser::PM_REMOVE,
+                ) != 0
+                {
+                    did_something = true;
+                    TranslateMessage(msg.as_ptr());
+                    DispatchMessageA(msg.as_ptr());
+                }
+
+                if !did_something {
+                    Sleep(5);
                 }
             }
 

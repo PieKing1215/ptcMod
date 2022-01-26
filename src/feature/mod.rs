@@ -1,4 +1,5 @@
 pub mod custom_note_rendering;
+pub mod drag_and_drop;
 pub mod fps_unlock;
 pub mod playhead;
 pub mod scroll_hook;
