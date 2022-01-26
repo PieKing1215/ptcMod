@@ -12,7 +12,7 @@ If you must, save often and make some backups - if it randomly segfaults or some
 
 ## Support
 The goal is to continuously support at least both ptCollage 0.9.2.5 and whatever the latest version is.<br>
-Currently 0.9.2.5 has all of the features enabled while 0.9.4.54 only has a few.
+Currently 0.9.2.5 and 0.9.4.54 are fully supported.
 
 ## Basic usage
 Have ptCollage.exe open and run the injector exe.<br>
@@ -45,7 +45,8 @@ Currently only applies in unit view; will be extended to keyboard view at some p
 
 ### Volume Fade
 If enabled, when the song is playing notes will have varying transparency based on their volume and velocity.<br>
-Currently only applies in unit view; will be extended to keyboard view at some point.
+Currently only applies in unit view; will be extended to keyboard view at some point.<br>
+**High performance impact.**
 
 ### Note Pulse
 If enabled, notes will pulse whiteish when they are played.<br>
@@ -55,8 +56,6 @@ Requires Scroll Hook.
 
 # Planned Features
 See [the Project page](https://github.com/users/PieKing1215/projects/2)
-
-Port custom rendering to 0.9.4.54
 
 Performance improvements (custom note rendering is extremely unoptimized)
 
