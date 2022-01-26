@@ -57,8 +57,8 @@ fn attach() -> anyhow::Result<()> {
         let dw_size = GetFileVersionInfoSizeA(lptstr_filename.as_ptr(), &mut dw_handle);
 
         if dw_size > 0 {
-            let mut buf: Vec<u8> = Vec::with_capacity(dw_size.try_into().unwrap());
-            buf.set_len(dw_size.try_into().unwrap());
+            let mut buf = Vec::new();
+            buf.resize(dw_size.try_into().unwrap(), 0);
 
             if GetFileVersionInfoA(
                 lptstr_filename.as_ptr(),
@@ -245,13 +245,13 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
 }
 
 #[no_mangle]
-pub extern "stdcall" fn DllMain(
+pub unsafe extern "stdcall" fn DllMain(
     hinst_dll: HINSTANCE,
     fdw_reason: DWORD,
     lp_reserved: LPVOID,
 ) -> i32 {
     match fdw_reason {
-        winapi::um::winnt::DLL_PROCESS_ATTACH => unsafe {
+        winapi::um::winnt::DLL_PROCESS_ATTACH => {
             DisableThreadLibraryCalls(hinst_dll);
             CreateThread(
                 std::ptr::null_mut(),
@@ -261,7 +261,7 @@ pub extern "stdcall" fn DllMain(
                 0,
                 std::ptr::null_mut(),
             );
-        },
+        }
         winapi::um::winnt::DLL_PROCESS_DETACH => {
             if !lp_reserved.is_null() {
                 match std::panic::catch_unwind(detach) {
@@ -270,28 +270,24 @@ pub extern "stdcall" fn DllMain(
                             .encode_utf16()
                             .collect();
                         let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-                        unsafe {
-                            winuser::MessageBoxW(
-                                std::ptr::null_mut(),
-                                l_msg.as_ptr(),
-                                l_title.as_ptr(),
-                                winuser::MB_OK | winuser::MB_ICONERROR,
-                            );
-                        }
+                        winuser::MessageBoxW(
+                            std::ptr::null_mut(),
+                            l_msg.as_ptr(),
+                            l_title.as_ptr(),
+                            winuser::MB_OK | winuser::MB_ICONERROR,
+                        );
                     }
                     Ok(Err(err)) => {
                         let l_msg: Vec<u16> = format!("detach exited with an Err: {:?}\0", err)
                             .encode_utf16()
                             .collect();
                         let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-                        unsafe {
-                            winuser::MessageBoxW(
-                                std::ptr::null_mut(),
-                                l_msg.as_ptr(),
-                                l_title.as_ptr(),
-                                winuser::MB_OK | winuser::MB_ICONERROR,
-                            );
-                        }
+                        winuser::MessageBoxW(
+                            std::ptr::null_mut(),
+                            l_msg.as_ptr(),
+                            l_title.as_ptr(),
+                            winuser::MB_OK | winuser::MB_ICONERROR,
+                        );
                     }
                     Ok(Ok(())) => {}
                 }
