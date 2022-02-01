@@ -270,10 +270,13 @@ impl PTCVersion for PTC09454 {
         unsafe {
             log::debug!("load_file_no_history({path:?})");
 
+            // if we don't do this, it crashes with scroll hook
             log::debug!("stop_playing()");
             let stop_playing: unsafe extern "stdcall" fn() -> bool = std::mem::transmute(addr(0x59a00) as *const ());
             let r = (stop_playing)();
             log::debug!("-> {r}");
+
+            // wfopen (0.9.4.54 uses wide strings)
 
             let mut cstr = U16CString::from_str(path.to_str().unwrap()).unwrap();
             let mut mode = U16CString::from_str("rb").unwrap();
@@ -287,6 +290,8 @@ impl PTCVersion for PTC09454 {
             let file = (wfopen)(cstr.as_mut_ptr(), mode.as_mut_ptr());
             log::debug!("-> {file:?}");
 
+            // read file
+
             let read_file: unsafe extern "thiscall" fn(
                 this: *mut libc::c_void,
                 file: *mut libc::FILE,
@@ -295,6 +300,8 @@ impl PTCVersion for PTC09454 {
             log::debug!("read_file(...)");
             let r = (read_file)(*(addr(0xbe020) as *mut usize) as *mut _, file);
             log::debug!("-> {r}");
+
+            // fclose
 
             let fclose: unsafe extern "cdecl" fn(
                 mode: *mut libc::FILE,
@@ -308,6 +315,8 @@ impl PTCVersion for PTC09454 {
                 this: *mut libc::c_void,
             ) -> u32 = std::mem::transmute(addr(0x8b010) as *const ());
 
+            // extra functions that need to be called
+
             log::debug!("fn_1(...)");
             let r = (fn_1)(*(addr(0xbe020) as *mut usize) as *mut _);
             log::debug!("-> {r}");
@@ -316,9 +325,15 @@ impl PTCVersion for PTC09454 {
             let fix_ui: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x56170) as *const ());
             (fix_ui)();
 
+            // clear save path + update window title
+            
             let clear_save_path: unsafe extern "fastcall" fn(
                 this: *mut libc::c_void,
             ) = std::mem::transmute(addr(0x2160) as *const ());
+
+            // some places in the decomp call this function with different parameters (only 0.9.4.54)
+            // the second one clears the save path
+
             // log::debug!("clear_save_path(1)");
             // (clear_save_path)(addr(0xbe040) as *mut _);
             log::debug!("clear_save_path(2)");
@@ -336,7 +351,7 @@ impl PTCVersion for PTC09454 {
 
             log::debug!("done.");
 
-            // // alt: read from path
+            // // alt: read from path, adds to history
             // let read_file2: unsafe extern "cdecl" fn(
             //     hwnd: HWND,
             //     path: *const libc::wchar_t,

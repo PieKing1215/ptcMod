@@ -287,10 +287,13 @@ impl PTCVersion for PTC0925 {
         unsafe {
             log::debug!("load_file_no_history({path:?})");
 
+            // if we don't do this, it crashes with scroll hook
             log::debug!("stop_playing()");
             let stop_playing: unsafe extern "stdcall" fn() -> bool = std::mem::transmute(addr(0x3ca0) as *const ());
             let r = (stop_playing)();
             log::debug!("-> {r}");
+
+            // fopen
 
             let cstr = path.to_str().and_then(|p| CString::new(p).ok()).unwrap();
             let mode = CString::new("rb").unwrap();
@@ -304,6 +307,8 @@ impl PTCVersion for PTC0925 {
             let mut file = (fopen)(cstr.as_ptr(), mode.as_ptr());
             log::debug!("-> {file:?}");
 
+            // read file
+
             let read_file: unsafe extern "thiscall" fn(
                 this: *mut libc::c_void,
                 file: *mut libc::c_void,
@@ -316,6 +321,8 @@ impl PTCVersion for PTC0925 {
             let r = (read_file)(*(addr(0xa4430) as *mut usize) as *mut _, ptr_2.cast(), 0);
             log::debug!("-> {r}");
 
+            // fclose
+
             let fclose: unsafe extern "cdecl" fn(
                 mode: *mut libc::FILE,
             ) -> libc::c_int = std::mem::transmute(addr(0x365c8) as *const ());
@@ -323,6 +330,8 @@ impl PTCVersion for PTC0925 {
             log::debug!("fclose({file:?})");
             let r = (fclose)(file);
             log::debug!("-> {r}");
+
+            // extra functions that need to be called
 
             let fn_1: unsafe extern "fastcall" fn(
                 this: *mut libc::c_void,
@@ -335,6 +344,8 @@ impl PTCVersion for PTC0925 {
             log::debug!("fix_ui()");
             let fix_ui: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x1940) as *const ());
             (fix_ui)();
+
+            // clear save path + update window title
 
             log::debug!("clear_save_path()");
             let clear_save_path: unsafe extern "fastcall" fn(
@@ -350,7 +361,7 @@ impl PTCVersion for PTC0925 {
 
             log::debug!("done.");
 
-            // // alt: read from path
+            // // alt: read from path, adds to history
             // let read_file2: unsafe extern "cdecl" fn(
             //     hwnd: HWND,
             //     path: *const libc::c_char,

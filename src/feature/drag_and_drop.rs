@@ -170,78 +170,87 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
     _pt: POINTL,
     _pdw_effect: *mut DWORD,
 ) -> HRESULT {
-    // TODO: flip these checks so they're bottom heavy
+    // if the dropped item is text and is a ptweb url, get the id
+    // (the capture group for id explicitly allows '/' so it can match private urls)
+    let re = Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-Z0-9/]+)$").unwrap();
+    let id = get_text(p_data_obj).as_ref()
+        .and_then(|txt| re.captures(txt.as_str())
+            .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string())));
 
-    // get text if the dropped item is text
-    if let Some(txt) = get_text(p_data_obj) {
-        // test if the text matches a ptweb url, and extract the id if so
-        let re =
-            Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-z0-9/]+)$").unwrap();
-        if let Some(cap) = re.captures(txt.as_str()) {
-            if let Some(id) = cap.get(1).map(|m| m.as_str()) {
-                // get the file
-                let url = format!("https://www.ptweb.me/get/{id}");
-                log::info!("GET {url}");
-                match reqwest::blocking::get(url) {
-                    Ok(resp) => {
-                        // got a response, check if 200
-                        log::debug!("{resp:?}");
-                        if resp.status() == reqwest::StatusCode::OK {
-                            // try to extract filename from headers, otherwise use {id}.ptcop
-                            let fname = resp
-                                .headers()
-                                .get("content-disposition")
-                                .and_then(|v| v.to_str().ok().and_then(|s| {
-                                    let s = s.strip_prefix("attachment; filename=\"");
-                                    s.and_then(|s| s.strip_suffix('\"'))
-                                }))
-                                .map(ToString::to_string)
-                                .unwrap_or(format!("{id}.ptcop"));
+    if let Some(id) = id {
+        // format url for download
+        let url = format!("https://www.ptweb.me/get/{id}");
 
-                            // make temp folder
-                            let mut pb = PathBuf::new();
-                            pb.push("ptweb/");
-                            match std::fs::create_dir_all(pb.clone()) {
-                                Ok(_) => {
-                                    // make file in the temp folder
-                                    pb.push(fname);
-                                    match File::create(pb.clone()) {
-                                        Ok(mut f) => {
-                                            // copy the response payload into the file
-                                            match std::io::copy(
-                                                &mut resp.bytes().unwrap().as_ref(),
-                                                &mut f,
-                                            ) {
-                                                Ok(_) => {
-                                                    log::info!("Downloaded file!");
-                                                    if pb.exists() {
-                                                        // load the file into ptCollage
-                                                        log::info!("Loading file...");
-                                                        PTC::load_file_no_history(pb.clone());
-                                                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
-                                                        log::info!("Loaded.");
-                                                        // remove the temp file
-                                                        log::info!("remove_file: {:?}", std::fs::remove_file(pb));
-                                                        log::info!("Deleted tempfile.");
-                                                    }
-                                                }
-                                                Err(e) => log::error!("Failed to write file: {e:?}"),
-                                            }
-                                        }
-                                        Err(e) => log::error!("Failed to create file: {e:?}"),
-                                    }
-                                }
-                                Err(e) => log::error!("Failed to create dirs: {e:?}"),
-                            } 
-                        } else {
-                            log::error!("Response was: {}", resp.status());
-                        }
-                    }
-                    Err(e) => {
-                        log::error!("GET request failed: {e:?}");
-                    }
+        log::info!("GET {url}");
+
+        let res = reqwest::blocking::get(url)
+            .map_err(|e| format!("GET request failed: {e:?}"))
+            .and_then(|resp| {
+                // got a response, check if 200
+                log::debug!("{resp:?}");
+
+                if resp.status() == reqwest::StatusCode::OK {
+                    Ok(resp)
+                } else {
+                    Err(format!("Response was: {}", resp.status()))
                 }
-            }
+            })
+            .and_then(|resp| {
+                // make temp folder
+                let mut pb = PathBuf::new();
+                pb.push("ptweb/");
+                std::fs::create_dir_all(pb.clone())
+                    .map_err(|e| format!("Failed to create dirs: {e:?}"))
+                    .map(|_| (resp, pb))
+            })
+            .and_then(|(resp, mut pb)| {
+                // try to extract filename from headers, otherwise use {id}.ptcop
+                let fname = resp
+                    .headers()
+                    .get("content-disposition")
+                    .and_then(|v| v.to_str().ok().and_then(|s| {
+                        s.strip_prefix("attachment; filename=\"")
+                            .and_then(|s| s.strip_suffix('\"'))
+                    }))
+                    .map(ToString::to_string)
+                    .unwrap_or(format!("{id}.ptcop"));
+
+                // make file in the temp folder
+                pb.push(fname);
+                File::create(pb.clone())
+                    .map_err(|e| format!("Failed to create file: {e:?}"))
+                    .map(|f| (resp, f, pb))
+            })
+            .and_then(|(resp, mut f, pb)| {
+                // copy payload bytes into file
+                std::io::copy(
+                    &mut resp.bytes().unwrap().as_ref(),
+                    &mut f,
+                )
+                .map_err(|e| format!("Failed to write file: {e:?}"))
+                .map(|_| pb)
+            })
+            .and_then(|pb| {
+                log::info!("Downloaded file!");
+                if pb.exists() {
+                    Ok(pb)
+                } else {
+                    Err(format!("File still doesn't exist: {pb:?}"))
+                }
+            });
+
+        match res {
+            Err(msg) => log::error!("{msg}"),
+            Ok(pb) => {
+                // load the file into ptCollage
+                log::info!("Loading file...");
+                PTC::load_file_no_history(pb.clone());
+                winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
+                log::info!("Loaded.");
+                // remove the temp file
+                log::info!("remove_file: {:?}", std::fs::remove_file(pb));
+                log::info!("Deleted tempfile.");
+            },
         }
     }
 
