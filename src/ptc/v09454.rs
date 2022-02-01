@@ -177,7 +177,7 @@ impl PTCVersion for PTC09454 {
         unsafe {
             *(addr(0xc02e0 + 0x14) as *mut i32)
                 - (*(addr(0xc02e0 + 0x68) as *mut f32) - *(addr(0xc02e0 + 0x60) as *mut f32)) as i32
-        }
+        }.max(0)
     }
 
     fn get_unit_rect() -> [i32; 4] {

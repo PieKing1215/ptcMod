@@ -83,8 +83,6 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
 }
 
 pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
-    // println!("draw_unitkb_top called");
-
     if PTC::is_playing() {
         {
             let smooth = winutil::get_menu_checked(*PTC::get_hwnd(), *M_SMOOTH_SCROLL_ID);
