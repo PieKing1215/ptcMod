@@ -289,7 +289,8 @@ impl PTCVersion for PTC0925 {
 
             // if we don't do this, it crashes with scroll hook
             log::debug!("stop_playing()");
-            let stop_playing: unsafe extern "stdcall" fn() -> bool = std::mem::transmute(addr(0x3ca0) as *const ());
+            let stop_playing: unsafe extern "stdcall" fn() -> bool =
+                std::mem::transmute(addr(0x3ca0) as *const ());
             let r = (stop_playing)();
             log::debug!("-> {r}");
 
@@ -316,16 +317,15 @@ impl PTCVersion for PTC0925 {
             ) -> u8 = std::mem::transmute(addr(0x25ef0) as *const ());
 
             let ptr_2: *mut *mut libc::FILE = &mut file;
-            
+
             log::debug!("read_file(...)");
             let r = (read_file)(*(addr(0xa4430) as *mut usize) as *mut _, ptr_2.cast(), 0);
             log::debug!("-> {r}");
 
             // fclose
 
-            let fclose: unsafe extern "cdecl" fn(
-                mode: *mut libc::FILE,
-            ) -> libc::c_int = std::mem::transmute(addr(0x365c8) as *const ());
+            let fclose: unsafe extern "cdecl" fn(mode: *mut libc::FILE) -> libc::c_int =
+                std::mem::transmute(addr(0x365c8) as *const ());
 
             log::debug!("fclose({file:?})");
             let r = (fclose)(file);
@@ -333,30 +333,28 @@ impl PTCVersion for PTC0925 {
 
             // extra functions that need to be called
 
-            let fn_1: unsafe extern "fastcall" fn(
-                this: *mut libc::c_void,
-            ) -> u8 = std::mem::transmute(addr(0x22c90) as *const ());
+            let fn_1: unsafe extern "fastcall" fn(this: *mut libc::c_void) -> u8 =
+                std::mem::transmute(addr(0x22c90) as *const ());
 
             log::debug!("fn_1(...)");
             let r = (fn_1)(*(addr(0xa4430) as *mut usize) as *mut _);
             log::debug!("-> {r}");
 
             log::debug!("fix_ui()");
-            let fix_ui: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x1940) as *const ());
+            let fix_ui: unsafe extern "stdcall" fn() =
+                std::mem::transmute(addr(0x1940) as *const ());
             (fix_ui)();
 
             // clear save path + update window title
 
             log::debug!("clear_save_path()");
-            let clear_save_path: unsafe extern "fastcall" fn(
-                this: *mut libc::c_void,
-            ) = std::mem::transmute(addr(0x1d0d0) as *const ());
+            let clear_save_path: unsafe extern "fastcall" fn(this: *mut libc::c_void) =
+                std::mem::transmute(addr(0x1d0d0) as *const ());
             (clear_save_path)(addr(0xa3598) as *mut _);
 
             log::debug!("set_window_title_path({cstr:?})");
-            let set_window_title_path: unsafe extern "cdecl" fn(
-                path: winapi::um::winnt::LPCSTR
-            ) = std::mem::transmute(addr(0x3ad0) as *const ());
+            let set_window_title_path: unsafe extern "cdecl" fn(path: winapi::um::winnt::LPCSTR) =
+                std::mem::transmute(addr(0x3ad0) as *const ());
             (set_window_title_path)(cstr.as_ptr());
 
             log::debug!("done.");

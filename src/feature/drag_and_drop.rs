@@ -39,7 +39,6 @@ pub struct DragAndDrop {
 
 impl DragAndDrop {
     pub fn new<PTC: PTCVersion>() -> Self {
-
         unsafe {
             // the transmutes here are because the definitions in IDropTargetVtbl incorrectly
             //   use `*const POINTL` instead of `POINTL` which messes up pdw_effect
@@ -58,7 +57,9 @@ impl DragAndDrop {
         }
 
         let data = DropHandlerData {
-            drop_target: IDropTarget { lpVtbl: unsafe { VTABLE.as_ref() }.unwrap() as *const IDropTargetVtbl },
+            drop_target: IDropTarget {
+                lpVtbl: unsafe { VTABLE.as_ref() }.unwrap() as *const IDropTargetVtbl,
+            },
             state: DROPEFFECT_NONE,
         };
 
@@ -173,9 +174,10 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
     // if the dropped item is text and is a ptweb url, get the id
     // (the capture group for id explicitly allows '/' so it can match private urls)
     let re = Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-Z0-9/]+)$").unwrap();
-    let id = get_text(p_data_obj).as_ref()
-        .and_then(|txt| re.captures(txt.as_str())
-            .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string())));
+    let id = get_text(p_data_obj).as_ref().and_then(|txt| {
+        re.captures(txt.as_str())
+            .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+    });
 
     if let Some(id) = id {
         // format url for download
@@ -208,10 +210,12 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
                 let fname = resp
                     .headers()
                     .get("content-disposition")
-                    .and_then(|v| v.to_str().ok().and_then(|s| {
-                        s.strip_prefix("attachment; filename=\"")
-                            .and_then(|s| s.strip_suffix('\"'))
-                    }))
+                    .and_then(|v| {
+                        v.to_str().ok().and_then(|s| {
+                            s.strip_prefix("attachment; filename=\"")
+                                .and_then(|s| s.strip_suffix('\"'))
+                        })
+                    })
                     .map(ToString::to_string)
                     .unwrap_or(format!("{id}.ptcop"));
 
@@ -223,12 +227,9 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
             })
             .and_then(|(resp, mut f, pb)| {
                 // copy payload bytes into file
-                std::io::copy(
-                    &mut resp.bytes().unwrap().as_ref(),
-                    &mut f,
-                )
-                .map_err(|e| format!("Failed to write file: {e:?}"))
-                .map(|_| pb)
+                std::io::copy(&mut resp.bytes().unwrap().as_ref(), &mut f)
+                    .map_err(|e| format!("Failed to write file: {e:?}"))
+                    .map(|_| pb)
             })
             .and_then(|pb| {
                 log::info!("Downloaded file!");
@@ -250,7 +251,7 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
                 // remove the temp file
                 log::info!("remove_file: {:?}", std::fs::remove_file(pb));
                 log::info!("Deleted tempfile.");
-            },
+            }
         }
     }
 
