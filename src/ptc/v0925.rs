@@ -1,3 +1,5 @@
+use std::ffi::CString;
+
 use crate::{
     feature::{
         custom_note_rendering::{self, CustomNoteRendering},
@@ -278,6 +280,89 @@ impl PTCVersion for PTC0925 {
                 ev_type: i32,
             ) -> i32 = std::mem::transmute(addr(0x8f80) as *const ());
             (get_event_value)(pos_x, unit_no, ev_type)
+        }
+    }
+
+    fn load_file_no_history(path: std::path::PathBuf) {
+        unsafe {
+            log::debug!("load_file_no_history({path:?})");
+
+            log::debug!("stop_playing()");
+            let stop_playing: unsafe extern "stdcall" fn() -> bool = std::mem::transmute(addr(0x3ca0) as *const ());
+            let r = (stop_playing)();
+            log::debug!("-> {r}");
+
+            let cstr = path.to_str().and_then(|p| CString::new(p).ok()).unwrap();
+            let mode = CString::new("rb").unwrap();
+
+            let fopen: unsafe extern "cdecl" fn(
+                fname: *const libc::c_char,
+                mode: *const libc::c_char,
+            ) -> *mut libc::FILE = std::mem::transmute(addr(0x3688e) as *const ());
+
+            log::debug!("fopen({cstr:?}, {mode:?})");
+            let mut file = (fopen)(cstr.as_ptr(), mode.as_ptr());
+            log::debug!("-> {file:?}");
+
+            let read_file: unsafe extern "thiscall" fn(
+                this: *mut libc::c_void,
+                file: *mut libc::c_void,
+                unk: u8,
+            ) -> u8 = std::mem::transmute(addr(0x25ef0) as *const ());
+
+            let ptr_2: *mut *mut libc::FILE = &mut file;
+            
+            log::debug!("read_file(...)");
+            let r = (read_file)(*(addr(0xa4430) as *mut usize) as *mut _, ptr_2.cast(), 0);
+            log::debug!("-> {r}");
+
+            let fclose: unsafe extern "cdecl" fn(
+                mode: *mut libc::FILE,
+            ) -> libc::c_int = std::mem::transmute(addr(0x365c8) as *const ());
+
+            log::debug!("fclose({file:?})");
+            let r = (fclose)(file);
+            log::debug!("-> {r}");
+
+            let fn_1: unsafe extern "fastcall" fn(
+                this: *mut libc::c_void,
+            ) -> u8 = std::mem::transmute(addr(0x22c90) as *const ());
+
+            log::debug!("fn_1(...)");
+            let r = (fn_1)(*(addr(0xa4430) as *mut usize) as *mut _);
+            log::debug!("-> {r}");
+
+            log::debug!("fix_ui()");
+            let fix_ui: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x1940) as *const ());
+            (fix_ui)();
+
+            log::debug!("clear_save_path()");
+            let clear_save_path: unsafe extern "fastcall" fn(
+                this: *mut libc::c_void,
+            ) = std::mem::transmute(addr(0x1d0d0) as *const ());
+            (clear_save_path)(addr(0xa3598) as *mut _);
+
+            log::debug!("set_window_title_path({cstr:?})");
+            let set_window_title_path: unsafe extern "cdecl" fn(
+                path: winapi::um::winnt::LPCSTR
+            ) = std::mem::transmute(addr(0x3ad0) as *const ());
+            (set_window_title_path)(cstr.as_ptr());
+
+            log::debug!("done.");
+
+            // // alt: read from path
+            // let read_file2: unsafe extern "cdecl" fn(
+            //     hwnd: HWND,
+            //     path: *const libc::c_char,
+            //     a: *mut bool,
+            //     b: *mut bool,
+            // ) -> u32 = std::mem::transmute(addr(0x2590) as *const ());
+
+            // let cstr = path.to_str().and_then(|p| CString::new(p).ok()).unwrap();
+            // let mut a = false;
+            // let mut b = false;
+            // let _r = (read_file2)(*Self::get_hwnd(), cstr.as_ptr(), &mut a, &mut b);
+            // log::debug!("read_file2 => {r}");
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{ffi::CString, intrinsics::transmute, ptr};
+use std::{ffi::CString, fs::File, intrinsics::transmute, path::PathBuf, ptr, string::ToString};
 
 use regex::Regex;
 use winapi::{
@@ -6,7 +6,7 @@ use winapi::{
         guiddef::REFIID,
         minwindef::{DWORD, ULONG},
         windef::POINTL,
-        wtypes::{CLIPFORMAT, DVASPECT_CONTENT},
+        wtypes::DVASPECT_CONTENT,
     },
     um::{
         objidl::{IDataObject, FORMATETC, TYMED_HGLOBAL},
@@ -26,20 +26,7 @@ lazy_static::lazy_static! {
     static ref M_DRAGDROP_ID: u16 = winutil::next_id();
 }
 
-// the transmutes here are because the definitions in IDropTargetVtbl incorrectly
-//   use `*const POINTL` instead of `POINTL` which messes up pdw_effect
-// my functions correctly use POINTL so they need to be forced into place
-static VTABLE: IDropTargetVtbl = IDropTargetVtbl {
-    parent: IUnknownVtbl {
-        QueryInterface: query_interface,
-        AddRef: add_ref,
-        Release: release,
-    },
-    DragEnter: unsafe { transmute::<*const (), _>(drag_enter as *const ()) },
-    DragOver: unsafe { transmute::<*const (), _>(drag_over as *const ()) },
-    DragLeave: drag_leave,
-    Drop: unsafe { transmute::<*const (), _>(drop as *const ()) },
-};
+static mut VTABLE: Option<IDropTargetVtbl> = None;
 
 pub struct DropHandlerData {
     drop_target: IDropTarget,
@@ -52,8 +39,26 @@ pub struct DragAndDrop {
 
 impl DragAndDrop {
     pub fn new<PTC: PTCVersion>() -> Self {
+
+        unsafe {
+            // the transmutes here are because the definitions in IDropTargetVtbl incorrectly
+            //   use `*const POINTL` instead of `POINTL` which messes up pdw_effect
+            // my functions correctly use POINTL so they need to be forced into place
+            VTABLE = Some(IDropTargetVtbl {
+                parent: IUnknownVtbl {
+                    QueryInterface: query_interface,
+                    AddRef: add_ref,
+                    Release: release,
+                },
+                DragEnter: transmute::<*const (), _>(drag_enter as *const ()),
+                DragOver: transmute::<*const (), _>(drag_over as *const ()),
+                DragLeave: drag_leave,
+                Drop: transmute::<*const (), _>(drop::<PTC> as *const ()),
+            });
+        }
+
         let data = DropHandlerData {
-            drop_target: IDropTarget { lpVtbl: std::ptr::addr_of!(VTABLE) },
+            drop_target: IDropTarget { lpVtbl: unsafe { VTABLE.as_ref() }.unwrap() as *const IDropTargetVtbl },
             state: DROPEFFECT_NONE,
         };
 
@@ -158,20 +163,84 @@ unsafe extern "system" fn drag_leave(_this: *mut IDropTarget) -> HRESULT {
     0
 }
 
-unsafe extern "system" fn drop(
+unsafe extern "system" fn drop<PTC: PTCVersion>(
     _this: *mut IDropTarget,
     p_data_obj: *const IDataObject,
     _grf_key_state: DWORD,
     _pt: POINTL,
     _pdw_effect: *mut DWORD,
 ) -> HRESULT {
+    // TODO: flip these checks so they're bottom heavy
+
+    // get text if the dropped item is text
     if let Some(txt) = get_text(p_data_obj) {
+        // test if the text matches a ptweb url, and extract the id if so
         let re =
             Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-z0-9/]+)$").unwrap();
         if let Some(cap) = re.captures(txt.as_str()) {
             if let Some(id) = cap.get(1).map(|m| m.as_str()) {
+                // get the file
                 let url = format!("https://www.ptweb.me/get/{id}");
                 log::info!("GET {url}");
+                match reqwest::blocking::get(url) {
+                    Ok(resp) => {
+                        // got a response, check if 200
+                        log::debug!("{resp:?}");
+                        if resp.status() == reqwest::StatusCode::OK {
+                            // try to extract filename from headers, otherwise use {id}.ptcop
+                            let fname = resp
+                                .headers()
+                                .get("content-disposition")
+                                .and_then(|v| v.to_str().ok().and_then(|s| {
+                                    let s = s.strip_prefix("attachment; filename=\"");
+                                    s.and_then(|s| s.strip_suffix('\"'))
+                                }))
+                                .map(ToString::to_string)
+                                .unwrap_or(format!("{id}.ptcop"));
+
+                            // make temp folder
+                            let mut pb = PathBuf::new();
+                            pb.push("ptweb/");
+                            match std::fs::create_dir_all(pb.clone()) {
+                                Ok(_) => {
+                                    // make file in the temp folder
+                                    pb.push(fname);
+                                    match File::create(pb.clone()) {
+                                        Ok(mut f) => {
+                                            // copy the response payload into the file
+                                            match std::io::copy(
+                                                &mut resp.bytes().unwrap().as_ref(),
+                                                &mut f,
+                                            ) {
+                                                Ok(_) => {
+                                                    log::info!("Downloaded file!");
+                                                    if pb.exists() {
+                                                        // load the file into ptCollage
+                                                        log::info!("Loading file...");
+                                                        PTC::load_file_no_history(pb.clone());
+                                                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
+                                                        log::info!("Loaded.");
+                                                        // remove the temp file
+                                                        log::info!("remove_file: {:?}", std::fs::remove_file(pb));
+                                                        log::info!("Deleted tempfile.");
+                                                    }
+                                                }
+                                                Err(e) => log::error!("Failed to write file: {e:?}"),
+                                            }
+                                        }
+                                        Err(e) => log::error!("Failed to create file: {e:?}"),
+                                    }
+                                }
+                                Err(e) => log::error!("Failed to create dirs: {e:?}"),
+                            } 
+                        } else {
+                            log::error!("Response was: {}", resp.status());
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("GET request failed: {e:?}");
+                    }
+                }
             }
         }
     }

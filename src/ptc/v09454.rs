@@ -1,3 +1,4 @@
+use widestring::U16CString;
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::{
@@ -262,6 +263,93 @@ impl PTCVersion for PTC09454 {
                 ev_type: i32,
             ) -> i32 = std::mem::transmute(addr(0x601c0) as *const ());
             (get_event_value)(pos_x as f32, unit_no, ev_type)
+        }
+    }
+
+    fn load_file_no_history(path: std::path::PathBuf) {
+        unsafe {
+            log::debug!("load_file_no_history({path:?})");
+
+            log::debug!("stop_playing()");
+            let stop_playing: unsafe extern "stdcall" fn() -> bool = std::mem::transmute(addr(0x59a00) as *const ());
+            let r = (stop_playing)();
+            log::debug!("-> {r}");
+
+            let mut cstr = U16CString::from_str(path.to_str().unwrap()).unwrap();
+            let mut mode = U16CString::from_str("rb").unwrap();
+
+            let wfopen: unsafe extern "cdecl" fn(
+                fname: *mut libc::wchar_t,
+                mode: *mut libc::wchar_t,
+            ) -> *mut libc::FILE = std::mem::transmute(*(addr(0x9a20c) as *const usize) as *const ());
+
+            log::debug!("wfopen({cstr:?}, {mode:?})");
+            let file = (wfopen)(cstr.as_mut_ptr(), mode.as_mut_ptr());
+            log::debug!("-> {file:?}");
+
+            let read_file: unsafe extern "thiscall" fn(
+                this: *mut libc::c_void,
+                file: *mut libc::FILE,
+            ) -> u32 = std::mem::transmute(addr(0x8ad90) as *const ());
+            
+            log::debug!("read_file(...)");
+            let r = (read_file)(*(addr(0xbe020) as *mut usize) as *mut _, file);
+            log::debug!("-> {r}");
+
+            let fclose: unsafe extern "cdecl" fn(
+                mode: *mut libc::FILE,
+            ) -> libc::c_int = std::mem::transmute(*(addr(0x9a204) as *const usize) as *const ());
+
+            log::debug!("fclose({file:?})");
+            let r = (fclose)(file);
+            log::debug!("-> {r}");
+
+            let fn_1: unsafe extern "fastcall" fn(
+                this: *mut libc::c_void,
+            ) -> u32 = std::mem::transmute(addr(0x8b010) as *const ());
+
+            log::debug!("fn_1(...)");
+            let r = (fn_1)(*(addr(0xbe020) as *mut usize) as *mut _);
+            log::debug!("-> {r}");
+
+            log::debug!("fix_ui()");
+            let fix_ui: unsafe extern "stdcall" fn() = std::mem::transmute(addr(0x56170) as *const ());
+            (fix_ui)();
+
+            let clear_save_path: unsafe extern "fastcall" fn(
+                this: *mut libc::c_void,
+            ) = std::mem::transmute(addr(0x2160) as *const ());
+            // log::debug!("clear_save_path(1)");
+            // (clear_save_path)(addr(0xbe040) as *mut _);
+            log::debug!("clear_save_path(2)");
+            (clear_save_path)(*(addr(0xbe044) as *mut usize) as *mut _);
+            // log::debug!("clear_save_path(3)");
+            // (clear_save_path)(addr(0xbe048) as *mut _);
+            // log::debug!("clear_save_path(4)");
+            // (clear_save_path)(addr(0xbe04c) as *mut _);
+
+            log::debug!("set_window_title_path({cstr:?})");
+            let set_window_title_path: unsafe extern "cdecl" fn(
+                path: winapi::um::winnt::LPCWSTR
+            ) = std::mem::transmute(addr(0x59650) as *const ());
+            (set_window_title_path)(cstr.as_ptr());
+
+            log::debug!("done.");
+
+            // // alt: read from path
+            // let read_file2: unsafe extern "cdecl" fn(
+            //     hwnd: HWND,
+            //     path: *const libc::wchar_t,
+            //     a: *mut bool,
+            //     b: *mut bool,
+            // ) -> u32 = std::mem::transmute(addr(0x56540) as *const ());
+
+            // let path = path.as_ref();
+            // let cstr = path.to_str().and_then(|p| U16CString::from_str(p).ok()).unwrap();
+            // let mut a = false;
+            // let mut b = false;
+            // let _r = (read_file2)(*Self::get_hwnd(), cstr.as_ptr(), &mut a, &mut b);
+            // log::debug!("read_file2 => {r}");
         }
     }
 }

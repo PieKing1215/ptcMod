@@ -1,6 +1,8 @@
 pub mod v0925;
 pub mod v09454;
 
+use std::path::PathBuf;
+
 use winapi::{
     shared::{minwindef::HINSTANCE, windef::HWND},
     um::libloaderapi::GetModuleHandleA,
@@ -34,6 +36,7 @@ pub trait PTCVersion {
     fn draw_rect(rect: [i32; 4], color: u32);
     fn get_base_note_colors_argb() -> [u32; 2];
     fn get_event_value_at_screen_pos(pos_x: i32, unit_no: i32, ev_type: i32) -> i32;
+    fn load_file_no_history(path: PathBuf);
 }
 
 pub fn addr(relative: usize) -> usize {
