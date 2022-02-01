@@ -271,16 +271,20 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
     let color = u32::from_be_bytes([0xff, rgb_arr[0], rgb_arr[1], rgb_arr[2]]);
 
-    // left edge
+    // main
     PTC::draw_rect([rect[0], rect[1], rect[2], rect[3]], color);
 
-    // main
-    PTC::draw_rect([rect[0] - 1, rect[1] - 1, rect[0], rect[3] + 1], color);
-    PTC::draw_rect([rect[0] - 2, rect[1] - 3, rect[0] - 1, rect[3] + 3], color);
+    if rect[0] > PTC::get_unit_rect()[0] {
+        // left edge
+        PTC::draw_rect([rect[0] - 1, rect[1] - 1, rect[0], rect[3] + 1], color);
+        PTC::draw_rect([rect[0] - 2, rect[1] - 3, rect[0] - 1, rect[3] + 3], color);
+    }
 
-    // right edge
-    PTC::draw_rect([rect[2], rect[1], rect[2] + 1, rect[3]], color);
-    PTC::draw_rect([rect[2] + 1, rect[1] + 1, rect[2] + 2, rect[3] - 1], color);
+    if rect[2] > PTC::get_unit_rect()[0] {
+        // right edge
+        PTC::draw_rect([rect[2], rect[1], rect[2] + 1, rect[3]], color);
+        PTC::draw_rect([rect[2] + 1, rect[1] + 1, rect[2] + 2, rect[3] - 1], color);
+    }
 
     // let get_event_value: unsafe extern "cdecl" fn(pos_x: i32, unit_no: i32, ev_type: i32) -> i32 =
     // std::mem::transmute(addr(0x8f80) as *const ());
