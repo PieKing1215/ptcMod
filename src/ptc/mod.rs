@@ -16,6 +16,7 @@ pub trait PTCVersion {
     fn get_hinstance() -> &'static mut HINSTANCE;
     fn start_play();
     fn is_playing() -> bool;
+    fn get_tab() -> &'static mut u32;
     fn get_volume() -> &'static mut f32;
     fn get_version() -> (u32, u32, u32, u32);
     fn get_beat_num() -> &'static mut u32;

@@ -108,6 +108,10 @@ impl PTCVersion for PTC09454 {
         unsafe { *((*(addr(0xBE028) as *mut usize) + 0x94) as *mut u8) == 1 }
     }
 
+    fn get_tab() -> &'static mut u32 {
+        unsafe { &mut *(addr(0xc0210) as *mut u32) }
+    }
+
     fn get_volume() -> &'static mut f32 {
         unsafe { &mut *(addr(0xC00E0) as *mut f32) }
     }

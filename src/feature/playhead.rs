@@ -65,9 +65,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
 }
 
 pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
-    // println!("draw_unitkb_top called");
-
-    if scroll_hook::ENABLED && PTC::is_playing() {
+    if scroll_hook::ENABLED && PTC::is_playing() && *PTC::get_tab() > 0 {
         let unit_rect = PTC::get_unit_rect();
 
         let x = crate::feature::scroll_hook::LAST_PLAYHEAD_POS;
