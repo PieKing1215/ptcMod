@@ -59,6 +59,8 @@ See [the Project page](https://github.com/users/PieKing1215/projects/2)
 
 Performance improvements (custom note rendering is extremely unoptimized)
 
+Drag and drop [pxtone web](https://www.ptweb.me/) URLs
+
 More scrolling options - like snap to beat, or only scroll when the playhead is close to the right of the screen.
 
 Playhead timing adjustment (so you can compensate for latency)
