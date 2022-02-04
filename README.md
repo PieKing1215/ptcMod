@@ -55,7 +55,7 @@ Requires Scroll Hook.
 <br><br>
 
 # Planned Features
-See [the Project page](https://github.com/users/PieKing1215/projects/2)
+(Also see [the Project page](https://github.com/users/PieKing1215/projects/2))
 
 Performance improvements (custom note rendering is extremely unoptimized)
 
@@ -74,6 +74,10 @@ Smooth line/curve tool for volume panel.
 Auto backup tool that automatically backs up the opened song at certain intervals or something.
 
 Tempo change tool - enter a list of tempo changes and it will reposition notes/events to match.
+
+VST support
+
+Maybe built in sf2 support so you won't need to use a VST?
 
 Probably some more I can't think of.
 
