@@ -78,7 +78,7 @@ Tempo change tool - enter a list of tempo changes and it will reposition notes/e
 
 VST support
 
-Maybe built in sf2 support so you won't need to use a VST?
+Soundfont support
 
 Probably some more I can't think of.
 
