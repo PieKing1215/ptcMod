@@ -23,7 +23,7 @@ You can edit the mod's settings there, or click "Uninject" to close ptcMod.<br>
 # Features
 ### FPS Unlock
 If enabled, removes the fps limiting present in ptc 0.9.2.5.<br>
-(note: the fps counter only goes to 99 but it can render higher than that)
+(note: the fps counter only goes to 99 in vanilla ptc, but this mod also patches it so it can display 3 digits)
 
 ### Scroll Hook
 Enables custom scrolling handling. Some other features require this, and will be grayed out if scroll hook is disabled.<br>
