@@ -4,6 +4,7 @@ use crate::{
     feature::{
         custom_note_rendering::{self, CustomNoteRendering},
         drag_and_drop::DragAndDrop,
+        fps_display_fix::FPSDisplayFix,
         fps_unlock::FPSUnlock,
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
@@ -120,12 +121,26 @@ impl PTCVersion for PTC0925 {
 
         let f_playhead = Playhead::new::<Self>(draw_unitkb_top_patch);
 
+        // fps display fix
+
+        let digit_patch = Patch::new(0x167d1, vec![0x2], vec![0x3]).unwrap();
+
+        let number_x_patch =
+            Patch::new(0x167d7, vec![-0x14_i8 as u8], vec![(-0x14_i8 - 8) as u8]).unwrap();
+
+        let label_x_patch =
+            Patch::new(0x167c0, vec![-0x2c_i8 as u8], vec![(-0x2c_i8 - 8) as u8]).unwrap();
+
+        let f_fps_display_fix =
+            FPSDisplayFix::new::<Self>(digit_patch, number_x_patch, label_x_patch);
+
         vec![
             Box::new(FPSUnlock::new::<Self>()),
             Box::new(f_scroll_hook),
             Box::new(f_custom_note_rendering),
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
+            Box::new(f_fps_display_fix),
         ]
     }
 
@@ -223,7 +238,8 @@ impl PTCVersion for PTC0925 {
         unsafe {
             *(addr(0xa6d70 + 0x10) as *mut i32)
                 - (*(addr(0xa6d70 + 0x64) as *mut i32) - *(addr(0xa6d70 + 0x5c) as *mut i32))
-        }.max(0)
+        }
+        .max(0)
     }
 
     fn get_unit_rect() -> [i32; 4] {

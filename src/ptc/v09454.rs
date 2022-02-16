@@ -5,10 +5,11 @@ use crate::{
     feature::{
         custom_note_rendering::{self, CustomNoteRendering},
         drag_and_drop::DragAndDrop,
+        fps_display_fix::FPSDisplayFix,
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{hook, hook_pre_ret_new, Patch},
+    patch::{hook, hook_pre_ret_new, replace, Patch},
 };
 
 use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion};
@@ -80,11 +81,54 @@ impl PTCVersion for PTC09454 {
 
         let f_playhead = Playhead::new::<Self>(draw_unitkb_top_patch);
 
+        // fps display fix
+
+        let digit_patch = Patch::new(0x794f0, vec![0x2], vec![0x3]).unwrap();
+
+        let number_x_patch = hook!(
+            0x79524,
+            0x82e90,
+            "cdecl",
+            fn(x: f32, y: f32, num: i32, digit: u32),
+            |func: unsafe extern "cdecl" fn(x: f32, y: f32, num: i32, digit: u32),
+             x,
+             y,
+             num,
+             digit| {
+                func(x - 6.0, y, num, digit);
+            }
+        );
+
+        let label_x_patch = hook!(
+            0x794ea,
+            0x6fc0,
+            "thiscall",
+            fn(this: *mut libc::c_void, x: f32, y: f32, p3: *mut libc::c_void, p4: u32),
+            |func: unsafe extern "thiscall" fn(
+                this: *mut libc::c_void,
+                x: f32,
+                y: f32,
+                p3: *mut libc::c_void,
+                p4: u32,
+            ),
+             this,
+             x,
+             y,
+             p3,
+             p4| {
+                func(this, x - 6.0, y, p3, p4);
+            }
+        );
+
+        let f_fps_display_fix =
+            FPSDisplayFix::new::<Self>(digit_patch, number_x_patch, label_x_patch);
+
         vec![
             Box::new(f_scroll_hook),
             Box::new(f_custom_note_rendering),
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
+            Box::new(f_fps_display_fix),
         ]
     }
 
@@ -181,7 +225,8 @@ impl PTCVersion for PTC09454 {
         unsafe {
             *(addr(0xc02e0 + 0x14) as *mut i32)
                 - (*(addr(0xc02e0 + 0x68) as *mut f32) - *(addr(0xc02e0 + 0x60) as *mut f32)) as i32
-        }.max(0)
+        }
+        .max(0)
     }
 
     fn get_unit_rect() -> [i32; 4] {
