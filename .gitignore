@@ -3,3 +3,7 @@
 
 *.PTR
 *.PTR.*
+
+cargo-timing*.html
+*.gpr
+*.rep/
