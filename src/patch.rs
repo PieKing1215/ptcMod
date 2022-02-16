@@ -222,7 +222,6 @@ macro_rules! hook {
             unsafe extern $cc fn func($($p_name: $p_type),*)$( -> $ret)* {
                 let raw_fn: unsafe extern $cc fn($($p_name: $p_type),*)$( -> $ret)* =
                     std::mem::transmute(addr($fn_addr) as *const ());
-                (raw_fn)($($p_name),*);
                 $my_fn(raw_fn, $($p_name),*)
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
