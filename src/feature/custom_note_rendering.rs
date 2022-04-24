@@ -48,7 +48,13 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
         unsafe {
             let menu = menus.get_or_create::<PTC>("Rendering");
 
-            winutil::add_menu_toggle(menu, "Enabled", *M_CUSTOM_RENDERING_ENABLED_ID, false, true);
+            winutil::add_menu_toggle(
+                menu,
+                "Note Render Hook",
+                *M_CUSTOM_RENDERING_ENABLED_ID,
+                false,
+                true,
+            );
             winutil::add_menu_toggle(
                 menu,
                 "Colored Units",

@@ -26,7 +26,7 @@ impl Playhead {
 impl<PTC: PTCVersion> Feature<PTC> for Playhead {
     fn init(&mut self, menus: &mut Menus) {
         winutil::add_menu_toggle(
-            menus.get_default::<PTC>(),
+            menus.get_or_create::<PTC>("Rendering"),
             "Playhead",
             *M_PLAYHEAD_ID,
             false,
