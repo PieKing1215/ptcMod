@@ -15,14 +15,14 @@ sysinfo = { version = "0.23", default-features = false }
 winapi = { version = "0.3", features = ["std", "winver", "ole2"] }
 libc = { version = "0.2", features = ["use_std", "extra_traits"] }
 log = "0.4"
-simplelog = "0.11"
+simplelog = "0.12"
 anyhow = "1.0"
 colorsys = "0.6"
 path-absolutize = "3.0" # so we can get absolute paths to missing files
 lazy_static = "1.4"
 regex = "1.5"
 reqwest = { version = "0.11", features = ["blocking"] }
-widestring = "0.5.1"
+widestring = "0.5"
 
 [lib]
 name = "ptc_mod"

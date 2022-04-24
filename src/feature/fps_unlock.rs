@@ -1,9 +1,9 @@
-use winapi::{shared::windef::HMENU, um::winuser};
+use winapi::um::winuser;
 
 use crate::{
     patch::Patch,
     ptc::{addr, PTCVersion},
-    winutil,
+    winutil::{self, Menus},
 };
 
 use super::Feature;
@@ -34,8 +34,14 @@ impl FPSUnlock {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
-    fn init(&mut self, menu: HMENU) {
-        winutil::add_menu_toggle(menu, "FPS Unlock", *M_FPS_UNLOCK_ID, false, true);
+    fn init(&mut self, menus: &mut Menus) {
+        winutil::add_menu_toggle(
+            menus.get_default::<PTC>(),
+            "FPS Unlock",
+            *M_FPS_UNLOCK_ID,
+            false,
+            true,
+        );
     }
 
     fn cleanup(&mut self) {

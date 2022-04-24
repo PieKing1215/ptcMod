@@ -1,8 +1,12 @@
 use std::time::Instant;
 
-use winapi::{shared::windef::HMENU, um::winuser};
+use winapi::um::winuser;
 
-use crate::{patch::Patch, ptc::PTCVersion, winutil};
+use crate::{
+    patch::Patch,
+    ptc::PTCVersion,
+    winutil::{self, Menus},
+};
 
 use super::Feature;
 
@@ -29,9 +33,21 @@ impl Scroll {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for Scroll {
-    fn init(&mut self, menu: HMENU) {
-        winutil::add_menu_toggle(menu, "Scroll Hook", *M_SCROLL_HOOK_ID, false, true);
-        winutil::add_menu_toggle(menu, "Smooth Scroll", *M_SMOOTH_SCROLL_ID, false, false);
+    fn init(&mut self, menus: &mut Menus) {
+        winutil::add_menu_toggle(
+            menus.get_default::<PTC>(),
+            "Scroll Hook",
+            *M_SCROLL_HOOK_ID,
+            false,
+            true,
+        );
+        winutil::add_menu_toggle(
+            menus.get_default::<PTC>(),
+            "Smooth Scroll",
+            *M_SMOOTH_SCROLL_ID,
+            false,
+            false,
+        );
     }
 
     fn cleanup(&mut self) {

@@ -1,6 +1,4 @@
-use winapi::shared::windef::HMENU;
-
-use crate::{patch::Patch, ptc::PTCVersion};
+use crate::{patch::Patch, ptc::PTCVersion, winutil::Menus};
 
 use super::Feature;
 
@@ -21,7 +19,7 @@ impl FPSDisplayFix {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
-    fn init(&mut self, menu: HMENU) {
+    fn init(&mut self, _menus: &mut Menus) {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.apply() {
@@ -41,5 +39,5 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {}
+    fn win_msg(&mut self, _msg: &winapi::um::winuser::MSG) {}
 }

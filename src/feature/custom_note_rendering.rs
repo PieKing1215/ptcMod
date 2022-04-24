@@ -1,7 +1,11 @@
 use colorsys::ColorTransform;
-use winapi::{shared::windef::HMENU, um::winuser};
+use winapi::um::winuser;
 
-use crate::{patch::Patch, ptc::PTCVersion, winutil};
+use crate::{
+    patch::Patch,
+    ptc::PTCVersion,
+    winutil::{self, Menus},
+};
 
 use super::{scroll_hook, Feature};
 
@@ -40,17 +44,9 @@ impl CustomNoteRendering {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
-    fn init(&mut self, _menu: HMENU) {
+    fn init(&mut self, menus: &mut Menus) {
         unsafe {
-            let h_menu = winuser::GetMenu(*PTC::get_hwnd());
-            let menu = winuser::CreateMenu();
-            let l_title: Vec<u8> = "Rendering\0".bytes().collect();
-            winuser::AppendMenuA(
-                h_menu,
-                winuser::MF_POPUP,
-                menu as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
+            let menu = menus.get_or_create::<PTC>("Rendering");
 
             winutil::add_menu_toggle(menu, "Enabled", *M_CUSTOM_RENDERING_ENABLED_ID, false, true);
             winutil::add_menu_toggle(
@@ -67,12 +63,6 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 
     fn cleanup(&mut self) {
         unsafe {
-            winuser::RemoveMenu(
-                winuser::GetMenu(*PTC::get_hwnd()),
-                4,
-                winuser::MF_BYPOSITION,
-            );
-
             for p in &self.note_draw_patch {
                 if let Err(e) = p.unapply() {
                     log::warn!("note_rect_hook_patch: {:?}", e);

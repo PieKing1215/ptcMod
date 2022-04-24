@@ -1,6 +1,11 @@
-use winapi::{shared::windef::HMENU, um::winuser};
+use winapi::um::winuser;
 
-use crate::{feature::scroll_hook, patch::Patch, ptc::PTCVersion, winutil};
+use crate::{
+    feature::scroll_hook,
+    patch::Patch,
+    ptc::PTCVersion,
+    winutil::{self, Menus},
+};
 
 use super::Feature;
 
@@ -19,8 +24,14 @@ impl Playhead {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for Playhead {
-    fn init(&mut self, menu: HMENU) {
-        winutil::add_menu_toggle(menu, "Playhead", *M_PLAYHEAD_ID, false, false);
+    fn init(&mut self, menus: &mut Menus) {
+        winutil::add_menu_toggle(
+            menus.get_default::<PTC>(),
+            "Playhead",
+            *M_PLAYHEAD_ID,
+            false,
+            false,
+        );
     }
 
     fn cleanup(&mut self) {

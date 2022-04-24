@@ -18,7 +18,10 @@ use winapi::{
     },
 };
 
-use crate::{ptc::PTCVersion, winutil};
+use crate::{
+    ptc::PTCVersion,
+    winutil::{self, Menus},
+};
 
 use super::Feature;
 
@@ -68,8 +71,14 @@ impl DragAndDrop {
 }
 
 impl<PTC: PTCVersion> Feature<PTC> for DragAndDrop {
-    fn init(&mut self, menu: winapi::shared::windef::HMENU) {
-        winutil::add_menu_toggle(menu, "Drop URLs", *M_DRAGDROP_ID, false, true);
+    fn init(&mut self, menus: &mut Menus) {
+        winutil::add_menu_toggle(
+            menus.get_default::<PTC>(),
+            "Drop URLs",
+            *M_DRAGDROP_ID,
+            false,
+            true,
+        );
     }
 
     fn cleanup(&mut self) {

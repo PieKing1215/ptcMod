@@ -14,7 +14,11 @@ use winapi::{
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
 const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 
-use crate::{feature::Feature, ptc::PTCVersion, winutil};
+use crate::{
+    feature::Feature,
+    ptc::PTCVersion,
+    winutil::{self, Menus},
+};
 
 lazy_static::lazy_static! {
     static ref M_ABOUT_ID: u16 = winutil::next_id();
@@ -101,19 +105,13 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 winuser::MB_OK | winuser::MB_ICONINFORMATION,
             );
 
-            let h_menu = winuser::GetMenu(*hwnd);
-            let base = winuser::CreateMenu();
-            let l_title: Vec<u8> = "PTC Mod\0".bytes().collect();
-            winuser::AppendMenuA(
-                h_menu,
-                winuser::MF_POPUP,
-                base as usize,
-                l_title.as_ptr().cast::<i8>(),
-            );
+            let mut menus = Menus::new();
 
             for feat in &mut self.features {
-                feat.init(base);
+                feat.init(&mut menus);
             }
+
+            let base = menus.get_or_create::<PTC>("PTC Mod");
 
             let l_title: Vec<u8> = "About\0".bytes().collect();
             winuser::AppendMenuA(base, 0, *M_ABOUT_ID as usize, l_title.as_ptr().cast::<i8>());
@@ -178,7 +176,8 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 feat.cleanup();
             }
 
-            winuser::RemoveMenu(h_menu, 4, winuser::MF_BYPOSITION);
+            menus.cleanup::<PTC>();
+
             winuser::DrawMenuBar(*hwnd);
 
             winuser::UnhookWindowsHookEx(event_hook);

@@ -1,11 +1,13 @@
 #![allow(dead_code)]
 
-use std::{cell::Cell, ffi::CString};
+use std::{cell::Cell, collections::HashMap, ffi::CString};
 
 use winapi::{
     shared::windef::{HMENU, HWND},
     um::winuser,
 };
+
+use crate::ptc::PTCVersion;
 
 // system for assigning globally unique menu ids without hardcoded constants
 static mut MENU_ID_COUNTER: Cell<u16> = Cell::new(1000);
@@ -14,6 +16,50 @@ pub(crate) fn next_id() -> u16 {
     unsafe {
         MENU_ID_COUNTER.set(MENU_ID_COUNTER.get() + 1);
         MENU_ID_COUNTER.get()
+    }
+}
+
+pub struct Menus {
+    map: HashMap<String, HMENU>,
+}
+
+impl Menus {
+    pub fn new() -> Self {
+        Self { map: HashMap::new() }
+    }
+
+    pub fn get_or_create<PTC: PTCVersion>(&mut self, display: &str) -> HMENU {
+        *self
+            .map
+            .entry(display.to_string())
+            .or_insert_with(|| unsafe {
+                let h_menu = winuser::GetMenu(*PTC::get_hwnd());
+                let menu = winuser::CreateMenu();
+                let l_title: Vec<u8> = format!("{display}\0").bytes().collect();
+                winuser::AppendMenuA(
+                    h_menu,
+                    winuser::MF_POPUP,
+                    menu as usize,
+                    l_title.as_ptr().cast::<i8>(),
+                );
+                menu
+            })
+    }
+
+    pub fn get_default<PTC: PTCVersion>(&mut self) -> HMENU {
+        self.get_or_create::<PTC>("PTC Mod")
+    }
+
+    pub fn cleanup<PTC: PTCVersion>(self) {
+        for _ in self.map.keys() {
+            unsafe {
+                winuser::RemoveMenu(
+                    winuser::GetMenu(*PTC::get_hwnd()),
+                    4,
+                    winuser::MF_BYPOSITION,
+                );
+            }
+        }
     }
 }
 

@@ -9,7 +9,7 @@ use crate::{
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{hook, hook_pre_ret_new, replace, Patch},
+    patch::{hook, hook_pre_ret_new, Patch},
 };
 
 use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion};

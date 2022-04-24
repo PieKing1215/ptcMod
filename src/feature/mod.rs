@@ -5,12 +5,12 @@ pub mod fps_unlock;
 pub mod playhead;
 pub mod scroll_hook;
 
-use winapi::{shared::windef::HMENU, um::winuser::MSG};
+use winapi::um::winuser::MSG;
 
-use crate::ptc::PTCVersion;
+use crate::{ptc::PTCVersion, winutil::Menus};
 
 pub trait Feature<PTC: PTCVersion> {
-    fn init(&mut self, menu: HMENU);
+    fn init(&mut self, menus: &mut Menus);
     fn cleanup(&mut self);
     fn win_msg(&mut self, msg: &MSG);
 }
