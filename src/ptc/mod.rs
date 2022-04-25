@@ -1,3 +1,4 @@
+pub mod events;
 pub mod v0925;
 pub mod v09454;
 
@@ -9,6 +10,18 @@ use winapi::{
 };
 
 use crate::feature::Feature;
+
+use self::events::EventList;
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Selection {
+    pub meas_min: i32,
+    pub meas_max: i32,
+    pub beat_min: i32,
+    pub beat_max: i32,
+    pub clock_min: i32,
+    pub clock_max: i32,
+}
 
 pub trait PTCVersion {
     fn get_features() -> Vec<Box<dyn Feature<Self>>>;
@@ -29,6 +42,16 @@ pub trait PTCVersion {
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
     fn get_unit_rect() -> [i32; 4];
+    fn get_event_list() -> &'static mut EventList;
+    fn is_unit_highlighted(unit_no: i32) -> bool;
+    fn get_selected_range() -> Selection;
+
+    fn calc_clock_pos(meas: i32, beat: i32, clock: i32) -> i32 {
+        *Self::get_beat_num() as i32 * Self::get_beat_clock() as i32 * meas
+            + Self::get_beat_clock() as i32 * beat
+            + clock
+    }
+
     fn get_fill_about_dialog(
     ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize;
     fn center_window(hwnd: HWND);
@@ -38,6 +61,7 @@ pub trait PTCVersion {
     fn get_base_note_colors_argb() -> [u32; 2];
     fn get_event_value_at_screen_pos(pos_x: i32, unit_no: i32, ev_type: i32) -> i32;
     fn load_file_no_history(path: PathBuf);
+    fn volume_adjust_fill_selected_units(hwnd: HWND) -> bool;
 }
 
 pub fn addr(relative: usize) -> usize {
