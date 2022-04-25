@@ -12,7 +12,7 @@ If you must, save often and make some backups - if it randomly segfaults or some
 
 ## Support
 The goal is to continuously support at least both ptCollage 0.9.2.5 and whatever the latest version is.<br>
-Currently 0.9.2.5 and 0.9.4.54 are fully supported.
+Currently 0.9.2.5 and 0.9.4.54 (-> https://github.com/PieKing1215/ptcMod/issues/22) are fully supported.
 
 ## Basic usage
 Have ptCollage.exe open and run the injector exe.<br>
