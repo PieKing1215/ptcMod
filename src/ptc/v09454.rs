@@ -3,7 +3,6 @@ use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::{
     feature::{
-        custom_note_rendering::{self, CustomNoteRendering},
         drag_and_drop::DragAndDrop,
         fps_display_fix::FPSDisplayFix,
         playhead::{self, Playhead},
@@ -429,6 +428,22 @@ impl PTCVersion for PTC09454 {
     }
 
     fn volume_adjust_fill_selected_units(_hwnd: HWND) -> bool {
+        todo!()
+    }
+
+    fn get_unit_scroll_ofs_x() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_unit_scroll_ofs_y() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_unit_num() -> i32 {
+        todo!()
+    }
+
+    fn get_events_for_unit(_unit_no: i32) -> &'static [super::events::Event] {
         todo!()
     }
 }

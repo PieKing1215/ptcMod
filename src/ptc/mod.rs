@@ -11,7 +11,7 @@ use winapi::{
 
 use crate::feature::Feature;
 
-use self::events::EventList;
+use self::events::{Event, EventList};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Selection {
@@ -45,6 +45,10 @@ pub trait PTCVersion {
     fn get_event_list() -> &'static mut EventList;
     fn is_unit_highlighted(unit_no: i32) -> bool;
     fn get_selected_range() -> Selection;
+    fn get_unit_scroll_ofs_x() -> &'static i32;
+    fn get_unit_scroll_ofs_y() -> &'static i32;
+    fn get_unit_num() -> i32;
+    fn get_events_for_unit(unit_no: i32) -> &'static [Event];
 
     fn calc_clock_pos(meas: i32, beat: i32, clock: i32) -> i32 {
         *Self::get_beat_num() as i32 * Self::get_beat_clock() as i32 * meas

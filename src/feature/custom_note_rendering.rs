@@ -3,7 +3,7 @@ use winapi::um::winuser;
 
 use crate::{
     patch::Patch,
-    ptc::PTCVersion,
+    ptc::{events::EventType, PTCVersion},
     winutil::{self, Menus},
 };
 
@@ -26,12 +26,8 @@ pub struct CustomNoteRendering {
 }
 
 impl CustomNoteRendering {
-    pub fn new<PTC: PTCVersion>(
-        draw_unit_notes_patch: Patch,
-    ) -> Self {
-        Self {
-            draw_unit_notes_patch,
-        }
+    pub fn new<PTC: PTCVersion>(draw_unit_notes_patch: Patch) -> Self {
+        Self { draw_unit_notes_patch }
     }
 }
 
@@ -122,8 +118,104 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
     }
 }
 
+// complete replacement for the vanilla unit notes drawing function
+// this allows for much easier modification
 pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
-    PTC::draw_rect([0, 0, 100, 100], 0xffff00ff);
+    let meas_width = PTC::get_measure_width();
+    let ofs_x = PTC::get_unit_scroll_ofs_x();
+    let ofs_y = PTC::get_unit_scroll_ofs_y();
+
+    let bounds = &PTC::get_unit_rect();
+
+    let beat_clock = PTC::get_beat_clock();
+    let unit_num = PTC::get_unit_num();
+
+    let unit_height = 16;
+
+    for u in 0..unit_num {
+        if u * unit_height + unit_height >= *ofs_y
+            && u * unit_height < *ofs_y + (bounds[3] - bounds[1])
+        {
+            let y = bounds[1] + u * unit_height + unit_height / 2 - ofs_y;
+
+            let events = PTC::get_events_for_unit(u);
+
+            let dim = !PTC::is_unit_highlighted(u);
+
+            for eve in events {
+                // should always be true, but vanilla checks it so we will too
+                if i32::from(eve.unit) == u {
+                    match eve.kind {
+                        EventType::On => {
+                            let x = (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x
+                                + bounds[0];
+                            let x2 = ((eve.clock + eve.value) * (*meas_width as i32)
+                                / beat_clock as i32)
+                                - ofs_x
+                                + bounds[0];
+
+                            let note_rect = [
+                                (x + 2).max(bounds[0]),
+                                (y - 2).max(bounds[1]),
+                                (x2 - 2).min(bounds[2]),
+                                (y + 2).min(bounds[3]),
+                            ];
+
+                            let color = PTC::get_base_note_colors_argb()[if dim { 1 } else { 0 }];
+
+                            PTC::draw_rect(note_rect, color);
+
+                            if x > bounds[0] - 2 {
+                                // left edge
+                                PTC::draw_rect(
+                                    [
+                                        note_rect[0] - 1,
+                                        note_rect[1] - 1,
+                                        note_rect[0],
+                                        note_rect[3] + 1,
+                                    ],
+                                    color,
+                                );
+                                PTC::draw_rect(
+                                    [
+                                        note_rect[0] - 2,
+                                        note_rect[1] - 3,
+                                        note_rect[0] - 1,
+                                        note_rect[3] + 3,
+                                    ],
+                                    color,
+                                );
+                            }
+
+                            if note_rect[2] < bounds[2] {
+                                // right edge
+                                PTC::draw_rect(
+                                    [note_rect[2], note_rect[1], note_rect[2] + 1, note_rect[3]],
+                                    color,
+                                );
+                                PTC::draw_rect(
+                                    [
+                                        note_rect[2] + 1,
+                                        note_rect[1] + 1,
+                                        note_rect[2] + 2,
+                                        note_rect[3] - 1,
+                                    ],
+                                    color,
+                                );
+                            }
+                        }
+                        EventType::Velocity | EventType::Key => {}
+                        _ => {
+                            let x = (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x
+                                + bounds[0];
+                            let color = [0xff00f080, 0x007840][if dim { 1 } else { 0 }];
+                            PTC::draw_rect([x, y + 4, x + 2, y + 6], color);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
