@@ -155,3 +155,19 @@ pub(crate) fn add_menu_toggle(
     set_menu_checked(menu, id as u32, checked);
     set_menu_enabled(menu, id as u32, enabled);
 }
+
+/// Appends a new buttom menu item to the given HMENU
+pub(crate) fn add_menu_button(
+    menu: HMENU,
+    name: impl Into<String>,
+    id: impl Into<usize>,
+    enabled: bool,
+) {
+    let id = id.into();
+    let l_title = CString::new(name.into()).unwrap();
+    unsafe {
+        winuser::AppendMenuA(menu, 0, id, l_title.as_ptr().cast::<i8>());
+    }
+
+    set_menu_enabled(menu, id as u32, enabled);
+}

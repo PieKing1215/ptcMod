@@ -12,7 +12,7 @@ use crate::{
     patch::{hook, hook_pre_ret_new, Patch},
 };
 
-use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion};
+use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion, Selection};
 
 pub struct PTC09454;
 
@@ -241,6 +241,18 @@ impl PTCVersion for PTC09454 {
         }
     }
 
+    fn get_event_list() -> &'static mut super::events::EventList {
+        todo!()
+    }
+
+    fn is_unit_highlighted(_unit_no: i32) -> bool {
+        todo!()
+    }
+
+    fn get_selected_range() -> Selection {
+        todo!()
+    }
+
     fn get_fill_about_dialog(
     ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize
     {
@@ -414,5 +426,9 @@ impl PTCVersion for PTC09454 {
             // let _r = (read_file2)(*Self::get_hwnd(), cstr.as_ptr(), &mut a, &mut b);
             // log::debug!("read_file2 => {r}");
         }
+    }
+
+    fn volume_adjust_fill_selected_units(_hwnd: HWND) -> bool {
+        todo!()
     }
 }

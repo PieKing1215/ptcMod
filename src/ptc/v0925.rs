@@ -8,13 +8,14 @@ use crate::{
         fps_unlock::FPSUnlock,
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
+        volume_muliply::VolumeAdjuster,
         Feature,
     },
     patch::{hook, hook_post_ret_new, hook_pre_ret_new, Patch, replace},
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
-use super::{addr, PTCVersion};
+use super::{addr, events::EventList, PTCVersion, Selection};
 
 pub struct PTC0925;
 
@@ -153,6 +154,7 @@ impl PTCVersion for PTC0925 {
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
             Box::new(f_fps_display_fix),
+            Box::new(VolumeAdjuster::new()),
         ]
     }
 
@@ -256,6 +258,56 @@ impl PTCVersion for PTC0925 {
 
     fn get_unit_rect() -> [i32; 4] {
         unsafe { *(addr(0xa693c) as *const [i32; 4]) }
+    }
+
+    fn get_event_list() -> &'static mut super::events::EventList {
+        unsafe { &mut **((*(addr(0xa4430) as *mut usize) + 160) as *mut *mut EventList) }
+    }
+
+    fn is_unit_highlighted(unit_no: i32) -> bool {
+        unsafe {
+            let is_unit_highlighted: unsafe extern "cdecl" fn(unit: libc::c_int) -> bool =
+                std::mem::transmute(addr(0x71a0) as *const ());
+            (is_unit_highlighted)(unit_no)
+        }
+    }
+
+    fn get_selected_range() -> Selection {
+        unsafe {
+            let get_selected_range: unsafe extern "cdecl" fn(
+                meas_min: *mut i32,
+                meas_max: *mut i32,
+                beat_min: *mut i32,
+                beat_max: *mut i32,
+                clock_min: *mut i32,
+                clock_max: *mut i32,
+            ) -> bool = std::mem::transmute(addr(0x12940) as *const ());
+
+            let mut meas_min = 0;
+            let mut meas_max = 0;
+            let mut beat_min = 0;
+            let mut beat_max = 0;
+            let mut clock_min = 0;
+            let mut clock_max = 0;
+
+            (get_selected_range)(
+                &mut meas_min,
+                &mut beat_min,
+                &mut clock_min,
+                &mut meas_max,
+                &mut beat_max,
+                &mut clock_max,
+            );
+
+            Selection {
+                meas_min,
+                meas_max,
+                beat_min,
+                beat_max,
+                clock_min,
+                clock_max,
+            }
+        }
     }
 
     fn get_fill_about_dialog(
@@ -404,6 +456,14 @@ impl PTCVersion for PTC0925 {
             // let mut b = false;
             // let _r = (read_file2)(*Self::get_hwnd(), cstr.as_ptr(), &mut a, &mut b);
             // log::debug!("read_file2 => {r}");
+        }
+    }
+
+    fn volume_adjust_fill_selected_units(hwnd: HWND) -> bool {
+        unsafe {
+            let fill_selected_units: unsafe extern "cdecl" fn(hwnd: HWND) -> bool =
+                std::mem::transmute(addr(0x190b0) as *const ());
+            (fill_selected_units)(hwnd)
         }
     }
 }

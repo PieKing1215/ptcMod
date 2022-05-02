@@ -4,6 +4,7 @@ pub mod fps_display_fix;
 pub mod fps_unlock;
 pub mod playhead;
 pub mod scroll_hook;
+pub mod volume_muliply;
 
 use winapi::um::winuser::MSG;
 
