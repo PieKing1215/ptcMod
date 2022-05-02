@@ -22,23 +22,15 @@ static mut VOLUME_FADE: bool = true;
 static mut COLORED_UNITS: bool = true;
 
 pub struct CustomNoteRendering {
-    note_draw_patch: Vec<Patch>,
+    draw_unit_notes_patch: Patch,
 }
 
 impl CustomNoteRendering {
     pub fn new<PTC: PTCVersion>(
-        note_rect_push_ebp: Patch,
-        note_rect_hook_patch: Patch,
-        note_disable_left_edge: Patch,
-        note_disable_right_edge: Patch,
+        draw_unit_notes_patch: Patch,
     ) -> Self {
         Self {
-            note_draw_patch: vec![
-                note_rect_push_ebp,
-                note_rect_hook_patch,
-                note_disable_left_edge,
-                note_disable_right_edge,
-            ],
+            draw_unit_notes_patch,
         }
     }
 }
@@ -69,10 +61,8 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 
     fn cleanup(&mut self) {
         unsafe {
-            for p in &self.note_draw_patch {
-                if let Err(e) = p.unapply() {
-                    log::warn!("note_rect_hook_patch: {:?}", e);
-                }
+            if let Err(e) = self.draw_unit_notes_patch.unapply() {
+                log::warn!("draw_unit_notes_patch: {:?}", e);
             }
         }
     }
@@ -86,9 +76,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             if high == 0 {
                 if low == *M_CUSTOM_RENDERING_ENABLED_ID {
                     if winutil::menu_toggle(msg.hwnd, *M_CUSTOM_RENDERING_ENABLED_ID) {
-                        for p in &self.note_draw_patch {
-                            unsafe { p.apply() }.unwrap();
-                        }
+                        unsafe { self.draw_unit_notes_patch.apply() }.unwrap();
 
                         unsafe {
                             winutil::set_menu_enabled(
@@ -100,9 +88,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, true);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, true);
                     } else {
-                        for p in &self.note_draw_patch {
-                            unsafe { p.unapply() }.unwrap();
-                        }
+                        unsafe { self.draw_unit_notes_patch.unapply() }.unwrap();
 
                         winutil::set_menu_enabled(msg.hwnd, *M_NOTE_PULSE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
@@ -134,6 +120,10 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             }
         }
     }
+}
+
+pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
+    PTC::draw_rect([0, 0, 100, 100], 0xffff00ff);
 }
 
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead

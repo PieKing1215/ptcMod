@@ -10,7 +10,7 @@ use crate::{
         scroll_hook::{self, Scroll},
         Feature,
     },
-    patch::{hook, hook_post_ret_new, hook_pre_ret_new, Patch},
+    patch::{hook, hook_post_ret_new, hook_pre_ret_new, Patch, replace},
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -73,40 +73,52 @@ impl PTCVersion for PTC0925 {
 
         // custom note rendering
 
-        let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
-        let note_rect_hook_patch = hook!(
-            0x1469f,
-            0x1c0e0,
-            "cdecl",
-            fn(rect: *const i32, ebp: u32),
-            |_old_fn, rect, ebp| {
-                let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
-                let unit = *((ebp - 0x80) as *mut u32);
-                custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, unit, not_focused);
-            }
+        // let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
+        // let note_rect_hook_patch = hook!(
+        //     0x1469f,
+        //     0x1c0e0,
+        //     "cdecl",
+        //     fn(rect: *const i32, ebp: u32),
+        //     |_old_fn, rect, ebp| {
+        //         let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
+        //         let unit = *((ebp - 0x80) as *mut u32);
+        //         custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, unit, not_focused);
+        //     }
+        // );
+
+        // // first set here changes the spritesheet to empty, second NOPs the draw_image call completely
+        // // let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
+        // // let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
+        // let note_disable_left_edge = Patch::new(
+        //     0x146ca,
+        //     vec![0xe8, 0xa1, 0x77, 0x00, 0x00],
+        //     vec![0x90, 0x90, 0x90, 0x90, 0x90],
+        // )
+        // .unwrap();
+        // let note_disable_right_edge = Patch::new(
+        //     0x146f9,
+        //     vec![0xe8, 0x72, 0x77, 0x00, 0x00],
+        //     vec![0x90, 0x90, 0x90, 0x90, 0x90],
+        // )
+        // .unwrap();
+
+        // let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
+        //     note_rect_push_ebp,
+        //     note_rect_hook_patch,
+        //     note_disable_left_edge,
+        //     note_disable_right_edge,
+        // );
+
+        let draw_unit_notes = replace!(
+            0x166bb,
+            0x14480,
+            "stdcall",
+            fn(),
+            custom_note_rendering::draw_unit_notes::<PTC0925>
         );
 
-        // first set here changes the spritesheet to empty, second NOPs the draw_image call completely
-        // let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
-        // let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
-        let note_disable_left_edge = Patch::new(
-            0x146ca,
-            vec![0xe8, 0xa1, 0x77, 0x00, 0x00],
-            vec![0x90, 0x90, 0x90, 0x90, 0x90],
-        )
-        .unwrap();
-        let note_disable_right_edge = Patch::new(
-            0x146f9,
-            vec![0xe8, 0x72, 0x77, 0x00, 0x00],
-            vec![0x90, 0x90, 0x90, 0x90, 0x90],
-        )
-        .unwrap();
-
         let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
-            note_rect_push_ebp,
-            note_rect_hook_patch,
-            note_disable_left_edge,
-            note_disable_right_edge,
+            draw_unit_notes
         );
 
         // playhead

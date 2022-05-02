@@ -29,45 +29,45 @@ impl PTCVersion for PTC09454 {
 
         // custom note rendering
 
-        let note_rect_push_ebp = Patch::new(0x74cb7, vec![0x51], vec![0x55]).unwrap();
-        let note_rect_hook_patch = hook!(
-            0x74cc5,
-            0x7570,
-            "thiscall",
-            fn(this: *mut (), rect: *const [f32; 4], ebp: u32),
-            |_old_fn, _this, rect: *const [f32; 4], ebp| {
-                let not_focused = *((ebp - 0xbc) as *mut u32) != 0;
-                let unit = *((ebp - 0xcc) as *mut u32);
-                // let not_focused = false;
-                // let unit = 3;
-                let rect = [
-                    (*rect)[0] as i32,
-                    (*rect)[1] as i32,
-                    (*rect)[2] as i32,
-                    (*rect)[3] as i32,
-                ];
-                custom_note_rendering::draw_unit_note_rect::<PTC09454>(
-                    rect.as_ptr(),
-                    unit,
-                    not_focused,
-                );
-            }
-        );
+        // let note_rect_push_ebp = Patch::new(0x74cb7, vec![0x51], vec![0x55]).unwrap();
+        // let note_rect_hook_patch = hook!(
+        //     0x74cc5,
+        //     0x7570,
+        //     "thiscall",
+        //     fn(this: *mut (), rect: *const [f32; 4], ebp: u32),
+        //     |_old_fn, _this, rect: *const [f32; 4], ebp| {
+        //         let not_focused = *((ebp - 0xbc) as *mut u32) != 0;
+        //         let unit = *((ebp - 0xcc) as *mut u32);
+        //         // let not_focused = false;
+        //         // let unit = 3;
+        //         let rect = [
+        //             (*rect)[0] as i32,
+        //             (*rect)[1] as i32,
+        //             (*rect)[2] as i32,
+        //             (*rect)[3] as i32,
+        //         ];
+        //         custom_note_rendering::draw_unit_note_rect::<PTC09454>(
+        //             rect.as_ptr(),
+        //             unit,
+        //             not_focused,
+        //         );
+        //     }
+        // );
 
-        // for some reason NOPing the draw_image call directly crashes unlike in 0.9.2.5
-        // instead, this changes the conditional jumps around the draw_image calls into unconditional jumps
-        // so the draw_image is skipped
-        let note_disable_left_edge =
-            Patch::new(0x74ce2, vec![0x72, 0x3e], vec![0xeb, 0x3e]).unwrap();
-        let note_disable_right_edge =
-            Patch::new(0x74d31, vec![0x76, 0x41], vec![0xeb, 0x41]).unwrap();
+        // // for some reason NOPing the draw_image call directly crashes unlike in 0.9.2.5
+        // // instead, this changes the conditional jumps around the draw_image calls into unconditional jumps
+        // // so the draw_image is skipped
+        // let note_disable_left_edge =
+        //     Patch::new(0x74ce2, vec![0x72, 0x3e], vec![0xeb, 0x3e]).unwrap();
+        // let note_disable_right_edge =
+        //     Patch::new(0x74d31, vec![0x76, 0x41], vec![0xeb, 0x41]).unwrap();
 
-        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
-            note_rect_push_ebp,
-            note_rect_hook_patch,
-            note_disable_left_edge,
-            note_disable_right_edge,
-        );
+        // let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
+        //     note_rect_push_ebp,
+        //     note_rect_hook_patch,
+        //     note_disable_left_edge,
+        //     note_disable_right_edge,
+        // );
 
         // playhead
 
@@ -125,7 +125,7 @@ impl PTCVersion for PTC09454 {
 
         vec![
             Box::new(f_scroll_hook),
-            Box::new(f_custom_note_rendering),
+            // Box::new(f_custom_note_rendering),
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
             Box::new(f_fps_display_fix),
