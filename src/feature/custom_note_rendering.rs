@@ -156,7 +156,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 
     let rect = std::slice::from_raw_parts(rect, 4);
 
-    if PTC::is_playing() {
+    if PTC::is_playing() && (NOTE_PULSE || VOLUME_FADE) {
         if scroll_hook::ENABLED && rect[0] <= scroll_hook::LAST_PLAYHEAD_POS {
             // left of note is to the left of the playhead
 
