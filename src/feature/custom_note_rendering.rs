@@ -3,7 +3,12 @@ use winapi::um::winuser;
 
 use crate::{
     patch::Patch,
-    ptc::{events::EventType, PTCVersion},
+    ptc::{
+        addr,
+        drawing::{color::Color, ddraw, Draw, Rect},
+        events::EventType,
+        PTCVersion,
+    },
     winutil::{self, Menus},
 };
 
@@ -120,6 +125,8 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
 
 // complete replacement for the vanilla unit notes drawing function
 // this allows for much easier modification
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::field_reassign_with_default)]
 pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     let meas_width = PTC::get_measure_width();
     let ofs_x = PTC::get_unit_scroll_ofs_x();
@@ -132,6 +139,8 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     let unit_height = 16;
 
+    let mut draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
+
     for u in 0..unit_num {
         if u * unit_height + unit_height >= *ofs_y
             && u * unit_height < *ofs_y + (bounds[3] - bounds[1])
@@ -141,6 +150,10 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
             let events = PTC::get_events_for_unit(u);
 
             let dim = !PTC::is_unit_highlighted(u);
+
+            let color = Color::from_argb(PTC::get_base_note_colors_argb()[if dim { 1 } else { 0 }]);
+
+            // let mut batch_a = Vec::new();
 
             for eve in events {
                 // should always be true, but vanilla checks it so we will too
@@ -154,66 +167,117 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                                 - ofs_x
                                 + bounds[0];
 
-                            let note_rect = [
+                            let note_rect = Rect::<i32>::new(
                                 (x + 2).max(bounds[0]),
                                 (y - 2).max(bounds[1]),
                                 (x2 - 2).min(bounds[2]),
                                 (y + 2).min(bounds[3]),
-                            ];
+                            );
 
-                            let color = PTC::get_base_note_colors_argb()[if dim { 1 } else { 0 }];
-
-                            PTC::draw_rect(note_rect, color);
+                            draw.fill_rect(note_rect, color);
+                            // batch_a.push(note_rect);
 
                             if x > bounds[0] - 2 {
+                                draw.fill_rect(
+                                    Rect::<i32>::new(
+                                        note_rect.left - 1,
+                                        note_rect.top - 1,
+                                        note_rect.left,
+                                        note_rect.bottom + 1,
+                                    ),
+                                    color,
+                                );
+                                // batch_a.push(Rect::<i32>::new(
+                                //     note_rect.left - 1,
+                                //     note_rect.top - 1,
+                                //     note_rect.left,
+                                //     note_rect.bottom + 1,
+                                // ));
+
                                 // left edge
-                                PTC::draw_rect(
-                                    [
-                                        note_rect[0] - 1,
-                                        note_rect[1] - 1,
-                                        note_rect[0],
-                                        note_rect[3] + 1,
-                                    ],
+                                draw.fill_rect(
+                                    Rect::<i32>::new(
+                                        note_rect.left - 1,
+                                        note_rect.top - 1,
+                                        note_rect.left,
+                                        note_rect.bottom + 1,
+                                    ),
                                     color,
                                 );
-                                PTC::draw_rect(
-                                    [
-                                        note_rect[0] - 2,
-                                        note_rect[1] - 3,
-                                        note_rect[0] - 1,
-                                        note_rect[3] + 3,
-                                    ],
+                                // batch_a.push(Rect::<i32>::new(
+                                //     note_rect.left - 1,
+                                //     note_rect.top - 1,
+                                //     note_rect.left,
+                                //     note_rect.bottom + 1,
+                                // ));
+
+                                draw.fill_rect(
+                                    Rect::<i32>::new(
+                                        note_rect.left - 2,
+                                        note_rect.top - 3,
+                                        note_rect.left - 1,
+                                        note_rect.bottom + 3,
+                                    ),
                                     color,
                                 );
+                                // batch_a.push(Rect::<i32>::new(
+                                //     note_rect.left - 2,
+                                //     note_rect.top - 3,
+                                //     note_rect.left - 1,
+                                //     note_rect.bottom + 3,
+                                // ));
                             }
 
-                            if note_rect[2] < bounds[2] {
+                            if note_rect.right < bounds[2] {
                                 // right edge
-                                PTC::draw_rect(
-                                    [note_rect[2], note_rect[1], note_rect[2] + 1, note_rect[3]],
+                                draw.fill_rect(
+                                    Rect::<i32>::new(
+                                        note_rect.right,
+                                        note_rect.top,
+                                        note_rect.right + 1,
+                                        note_rect.bottom,
+                                    ),
                                     color,
                                 );
-                                PTC::draw_rect(
-                                    [
-                                        note_rect[2] + 1,
-                                        note_rect[1] + 1,
-                                        note_rect[2] + 2,
-                                        note_rect[3] - 1,
-                                    ],
+                                // batch_a.push(Rect::<i32>::new(
+                                //     note_rect.right,
+                                //     note_rect.top,
+                                //     note_rect.right + 1,
+                                //     note_rect.bottom,
+                                // ));
+                                draw.fill_rect(
+                                    Rect::<i32>::new(
+                                        note_rect.right + 1,
+                                        note_rect.top + 1,
+                                        note_rect.right + 2,
+                                        note_rect.bottom - 1,
+                                    ),
                                     color,
                                 );
+                                // batch_a.push(Rect::<i32>::new(
+                                //     note_rect.right + 1,
+                                //     note_rect.top + 1,
+                                //     note_rect.right + 2,
+                                //     note_rect.bottom - 1,
+                                // ));
                             }
                         }
                         EventType::Velocity | EventType::Key => {}
                         _ => {
                             let x = (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x
                                 + bounds[0];
-                            let color = [0xff00f080, 0x007840][if dim { 1 } else { 0 }];
-                            PTC::draw_rect([x, y + 4, x + 2, y + 6], color);
+                            if x > bounds[0] - 2 {
+                                let color = Color::from_argb(
+                                    [0xff00f080, 0x007840][if dim { 1 } else { 0 }],
+                                );
+                                draw.fill_rect(Rect::<i32>::new(x, y + 4, x + 2, y + 6), color);
+                            }
                         }
                     }
                 }
             }
+
+            // draw.fill_rect_batch(batch_a, color);
         }
     }
 }

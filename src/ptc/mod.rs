@@ -1,3 +1,4 @@
+pub mod drawing;
 pub mod events;
 pub mod v0925;
 pub mod v09454;
