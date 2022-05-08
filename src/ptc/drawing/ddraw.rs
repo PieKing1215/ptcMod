@@ -1,9 +1,19 @@
-use winapi::shared::{minwindef::DWORD, windef::LPRECT};
+use std::arch::asm;
+
+use winapi::shared::{minwindef::DWORD, windef::{LPRECT, HDC}};
 
 use super::{color::Color, Draw, Rect};
 
 pub struct IDirectDrawSurface {
     raw: *mut libc::c_void,
+    fn_blt: unsafe extern "stdcall" fn(
+        this: *mut libc::c_void,
+        dst: LPRECT,
+        unknown: *mut libc::c_void,
+        src: LPRECT,
+        flags: u32,
+        ddbltfx: *mut DDBLTFX,
+    ),
 }
 
 #[allow(non_snake_case)]
@@ -11,7 +21,17 @@ pub struct IDirectDrawSurface {
 #[allow(clippy::unused_self)]
 impl IDirectDrawSurface {
     pub unsafe fn wrap(raw: *mut libc::c_void) -> Self {
-        Self { raw }
+        #[allow(clippy::ptr_as_ptr)]
+        let fn_blt: unsafe extern "stdcall" fn(
+            this: *mut libc::c_void,
+            dst: LPRECT,
+            unknown: *mut libc::c_void,
+            src: LPRECT,
+            flags: u32,
+            ddbltfx: *mut DDBLTFX,
+        ) = std::mem::transmute(*((*(raw as *mut usize) + 0x14) as *const *const ()));
+
+        Self { raw, fn_blt }
     }
 
     pub unsafe fn QueryInterface(&self) {}
@@ -24,6 +44,7 @@ impl IDirectDrawSurface {
 
     pub unsafe fn AddOverlayDirtyRect(&self) {}
 
+    #[inline]
     pub unsafe fn blt(
         &self,
         dst: LPRECT,
@@ -32,16 +53,7 @@ impl IDirectDrawSurface {
         flags: DWORD,
         bltfx: *mut DDBLTFX,
     ) {
-        #[allow(clippy::ptr_as_ptr)]
-        let raw_fn: unsafe extern "stdcall" fn(
-            this: *mut libc::c_void,
-            dst: LPRECT,
-            unknown: *mut libc::c_void,
-            src: LPRECT,
-            flags: u32,
-            ddbltfx: *mut DDBLTFX,
-        ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x14) as *const *const ()));
-        (raw_fn)(self.raw, dst, unknown, src, flags, bltfx);
+        (self.fn_blt)(self.raw, dst, unknown, src, flags, bltfx);
     }
 
     pub unsafe fn blt_batch(&self, batch_array: *const DDBLTBATCH, batch_size: DWORD) {
@@ -76,6 +88,28 @@ impl IDirectDrawSurface {
         ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x1c) as *const *const ()));
         (raw_fn)(self.raw, x, y, unknown, src, blt_type);
     }
+
+    pub unsafe fn get_dc(&self) -> HDC {
+        #[allow(clippy::ptr_as_ptr)]
+        let raw_fn: unsafe extern "stdcall" fn(
+            this: *mut libc::c_void,
+            hdc: *mut HDC,
+        ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x44) as *const *const ()));
+
+        let mut hdc: HDC = std::ptr::null_mut();
+        (raw_fn)(self.raw, &mut hdc);
+        hdc
+    }
+
+    pub unsafe fn release_dc(&self, hdc: HDC) {
+        #[allow(clippy::ptr_as_ptr)]
+        let raw_fn: unsafe extern "stdcall" fn(
+            this: *mut libc::c_void,
+            hdc: HDC,
+        ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x68) as *const *const ()));
+
+        (raw_fn)(self.raw, hdc);
+    }
 }
 
 #[repr(C)]
@@ -94,12 +128,12 @@ pub struct DDBLTBATCH {
 }
 
 impl Draw for IDirectDrawSurface {
-    unsafe fn fill_rect(&mut self, rect: Rect<i32>, color: Color) {
+    unsafe fn fill_rect(&mut self, rect: &Rect<i32>, color: Color) {
         let mut ddbltfx = [0_u32; 25];
         ddbltfx[0] = 100;
         ddbltfx[20] = color.into_argb();
         self.blt(
-            std::ptr::addr_of!(rect) as *mut _,
+            rect as *const _ as *mut _,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             0x1000400,
@@ -127,4 +161,24 @@ impl Draw for IDirectDrawSurface {
 
         self.blt_batch(batches.as_ptr(), batches.len() as DWORD);
     }
+}
+
+pub unsafe fn create_surface(ddraw: *mut libc::c_void, width: i32, height: i32) -> *mut libc::c_void {
+    #[allow(clippy::ptr_as_ptr)]
+    let raw_fn: unsafe extern "stdcall" fn(
+        this: *mut libc::c_void,
+        surface_desc: *mut libc::c_void,
+        out_surf: *mut *mut libc::c_void,
+        unused: *mut libc::c_void,
+    ) = std::mem::transmute(*((*(ddraw as *mut usize) + 0x18) as *const *const ()));
+
+    let mut surface_desc = [0_i32; 0x6c / 4];
+    surface_desc[0] = 0x6c; // dwSize
+    surface_desc[1] = 0x00000001 | 0x00000002 | 0x00000004; // dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH
+    surface_desc[2] = height; // dwHeight
+    surface_desc[3] = width; // dwWidth
+
+    let mut out_surf = std::ptr::null_mut();
+    (raw_fn)(ddraw, surface_desc.as_mut_ptr().cast(), &mut out_surf, std::ptr::null_mut());
+    out_surf
 }

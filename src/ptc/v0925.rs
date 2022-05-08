@@ -13,7 +13,7 @@ use crate::{
     },
     patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
 };
-use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
+use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND, HDC}}, um::winuser::{GetWindowDC, GetDC}};
 
 use super::{
     addr,
@@ -164,6 +164,12 @@ impl PTCVersion for PTC0925 {
         unsafe { &mut *(addr(0xDD4440 - 0xd30000) as *mut HWND) }
     }
 
+    fn get_hdc() -> HDC {
+        unsafe {
+            GetDC(*Self::get_hwnd())
+        }
+    }
+
     fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {
         unsafe { &mut *(addr(0x00dd431c - 0xd30000) as *mut HINSTANCE) }
     }
@@ -310,6 +316,40 @@ impl PTCVersion for PTC0925 {
                 clock_min,
                 clock_max,
             }
+        }
+    }
+
+    fn get_unit_scroll_ofs_x() -> &'static i32 {
+        unsafe { &*(addr(0xa6d70 + 0x14) as *mut i32) }
+    }
+
+    fn get_unit_scroll_ofs_y() -> &'static i32 {
+        unsafe { &*(addr(0xa6ec0 + 0x14) as *mut i32) }
+    }
+
+    fn get_unit_num() -> i32 {
+        unsafe { *((*(addr(0xa4430) as *mut usize) + 60) as *mut i32) }
+    }
+
+    fn get_events_for_unit(unit_no: i32) -> &'static [super::events::Event] {
+        unsafe {
+            // reset lock
+            *(addr(0xa696c) as *mut bool) = false;
+
+            let mut raw_events = std::ptr::null_mut();
+            // log::debug!("{unit_no} {raw_events:?}");
+            let fill_events_for_unit: unsafe extern "cdecl" fn(
+                unit_no: u32,
+                events_ptr: *mut *mut Event,
+            ) -> i32 = std::mem::transmute(addr(0x8cd0) as *const ());
+            let count = (fill_events_for_unit)(unit_no as u32, &mut raw_events);
+
+            // log::debug!("{count} {raw_events:?}");
+
+            // reset lock again
+            *(addr(0xa696c) as *mut bool) = false;
+
+            slice::from_raw_parts(raw_events, count as usize)
         }
     }
 
@@ -467,40 +507,6 @@ impl PTCVersion for PTC0925 {
             let fill_selected_units: unsafe extern "cdecl" fn(hwnd: HWND) -> bool =
                 std::mem::transmute(addr(0x190b0) as *const ());
             (fill_selected_units)(hwnd)
-        }
-    }
-
-    fn get_unit_scroll_ofs_x() -> &'static i32 {
-        unsafe { &*(addr(0xa6d70 + 0x14) as *mut i32) }
-    }
-
-    fn get_unit_scroll_ofs_y() -> &'static i32 {
-        unsafe { &*(addr(0xa6ec0 + 0x14) as *mut i32) }
-    }
-
-    fn get_unit_num() -> i32 {
-        unsafe { *((*(addr(0xa4430) as *mut usize) + 60) as *mut i32) }
-    }
-
-    fn get_events_for_unit(unit_no: i32) -> &'static [super::events::Event] {
-        unsafe {
-            // reset lock
-            *(addr(0xa696c) as *mut bool) = false;
-
-            let mut raw_events = std::ptr::null_mut();
-            // log::debug!("{unit_no} {raw_events:?}");
-            let fill_events_for_unit: unsafe extern "cdecl" fn(
-                unit_no: u32,
-                events_ptr: *mut *mut Event,
-            ) -> i32 = std::mem::transmute(addr(0x8cd0) as *const ());
-            let count = (fill_events_for_unit)(unit_no as u32, &mut raw_events);
-
-            // log::debug!("{count} {raw_events:?}");
-
-            // reset lock again
-            *(addr(0xa696c) as *mut bool) = false;
-
-            slice::from_raw_parts(raw_events, count as usize)
         }
     }
 }

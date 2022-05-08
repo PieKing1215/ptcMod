@@ -6,13 +6,23 @@ pub mod v09454;
 use std::path::PathBuf;
 
 use winapi::{
-    shared::{minwindef::HINSTANCE, windef::HWND},
+    shared::{minwindef::HINSTANCE, windef::{HWND, HDC}},
     um::libloaderapi::GetModuleHandleA,
 };
 
 use crate::feature::Feature;
 
 use self::events::{Event, EventList};
+
+lazy_static::lazy_static! {
+    static ref BASE_ADDR: usize = unsafe { GetModuleHandleA(
+        "ptCollage.exe\0"
+            .bytes()
+            .collect::<Vec<u8>>()
+            .as_ptr()
+            .cast::<i8>(),
+    ) as usize };
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Selection {
@@ -27,6 +37,7 @@ pub struct Selection {
 pub trait PTCVersion {
     fn get_features() -> Vec<Box<dyn Feature<Self>>>;
     fn get_hwnd() -> &'static mut HWND;
+    fn get_hdc() -> HDC;
     fn get_hinstance() -> &'static mut HINSTANCE;
     fn start_play();
     fn is_playing() -> bool;
@@ -70,16 +81,7 @@ pub trait PTCVersion {
 }
 
 pub fn addr(relative: usize) -> usize {
-    unsafe {
-        let base = GetModuleHandleA(
-            "ptCollage.exe\0"
-                .bytes()
-                .collect::<Vec<u8>>()
-                .as_ptr()
-                .cast::<i8>(),
-        ) as usize;
-        base + relative
-    }
+    *BASE_ADDR + relative
 }
 
 // these two fns are functionally identical, but it's probably better to be explicit with the conversion
