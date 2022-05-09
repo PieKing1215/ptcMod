@@ -508,6 +508,25 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     }
                 }
             }
+            EventType::Key => {
+                let fade_color = if dim {
+                    Color::from_argb(0xff200040)
+                } else {
+                    Color::from_argb(0xff400070)
+                };
+
+                let x =
+                    (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                if x > bounds.left - 2 {
+                    if do_batching {
+                        batch_a.push((Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color));
+                        batch_a.push((Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color));
+                    } else {
+                        draw.fill_rect(&Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color);
+                        draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
+                    }
+                }
+            }
             EventType::Velocity | EventType::Key => {}
             _ => {
                 let x =
