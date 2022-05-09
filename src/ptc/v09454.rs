@@ -1,5 +1,5 @@
 use widestring::U16CString;
-use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND}}};
+use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use crate::{
     feature::{

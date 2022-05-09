@@ -1,5 +1,7 @@
-
-use winapi::shared::{minwindef::DWORD, windef::{LPRECT, HDC}};
+use winapi::shared::{
+    minwindef::DWORD,
+    windef::{HDC, LPRECT},
+};
 
 use super::{color::Color, Draw, Rect};
 
@@ -88,10 +90,7 @@ impl IDirectDrawSurface {
         (raw_fn)(self.raw, x, y, unknown, src, blt_type);
     }
 
-    pub unsafe fn delete_attached_surface(
-        &self,
-        surface: *mut libc::c_void,
-    ) {
+    pub unsafe fn delete_attached_surface(&self, surface: *mut libc::c_void) {
         #[allow(clippy::ptr_as_ptr)]
         let raw_fn: unsafe extern "stdcall" fn(
             this: *mut libc::c_void,
@@ -103,10 +102,8 @@ impl IDirectDrawSurface {
 
     pub unsafe fn get_dc(&self) -> HDC {
         #[allow(clippy::ptr_as_ptr)]
-        let raw_fn: unsafe extern "stdcall" fn(
-            this: *mut libc::c_void,
-            hdc: *mut HDC,
-        ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x44) as *const *const ()));
+        let raw_fn: unsafe extern "stdcall" fn(this: *mut libc::c_void, hdc: *mut HDC) =
+            std::mem::transmute(*((*(self.raw as *mut usize) + 0x44) as *const *const ()));
 
         let mut hdc: HDC = std::ptr::null_mut();
         (raw_fn)(self.raw, &mut hdc);
@@ -115,10 +112,8 @@ impl IDirectDrawSurface {
 
     pub unsafe fn release_dc(&self, hdc: HDC) {
         #[allow(clippy::ptr_as_ptr)]
-        let raw_fn: unsafe extern "stdcall" fn(
-            this: *mut libc::c_void,
-            hdc: HDC,
-        ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x68) as *const *const ()));
+        let raw_fn: unsafe extern "stdcall" fn(this: *mut libc::c_void, hdc: HDC) =
+            std::mem::transmute(*((*(self.raw as *mut usize) + 0x68) as *const *const ()));
 
         (raw_fn)(self.raw, hdc);
     }
@@ -175,7 +170,11 @@ impl Draw for IDirectDrawSurface {
     }
 }
 
-pub unsafe fn create_surface(ddraw: *mut libc::c_void, width: i32, height: i32) -> *mut libc::c_void {
+pub unsafe fn create_surface(
+    ddraw: *mut libc::c_void,
+    width: i32,
+    height: i32,
+) -> *mut libc::c_void {
     #[allow(clippy::ptr_as_ptr)]
     let raw_fn: unsafe extern "stdcall" fn(
         this: *mut libc::c_void,
@@ -191,6 +190,11 @@ pub unsafe fn create_surface(ddraw: *mut libc::c_void, width: i32, height: i32) 
     surface_desc[3] = width; // dwWidth
 
     let mut out_surf = std::ptr::null_mut();
-    (raw_fn)(ddraw, surface_desc.as_mut_ptr().cast(), &mut out_surf, std::ptr::null_mut());
+    (raw_fn)(
+        ddraw,
+        surface_desc.as_mut_ptr().cast(),
+        &mut out_surf,
+        std::ptr::null_mut(),
+    );
     out_surf
 }

@@ -13,7 +13,7 @@ use crate::{
     },
     patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
 };
-use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND}}};
+use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use super::{
     addr,

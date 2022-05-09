@@ -6,7 +6,7 @@ pub mod v09454;
 use std::path::PathBuf;
 
 use winapi::{
-    shared::{minwindef::HINSTANCE, windef::{HWND}},
+    shared::{minwindef::HINSTANCE, windef::HWND},
     um::libloaderapi::GetModuleHandleA,
 };
 

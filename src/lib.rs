@@ -42,7 +42,7 @@ fn attach() -> anyhow::Result<()> {
         winapi::um::wincon::AttachConsole(winapi::um::wincon::ATTACH_PARENT_PROCESS);
 
         println!("attach");
-        
+
         // need to get ptc version without depending on memory addresses since addresses change on different versions
         // unfortunately the code to get exe version with winapi is terrible
 
