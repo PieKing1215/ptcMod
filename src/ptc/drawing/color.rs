@@ -1,3 +1,5 @@
+use colorsys::ColorTransform;
+
 #[derive(Clone, Copy, Debug)]
 pub struct Color {
     pub r: u8,
@@ -77,12 +79,32 @@ impl Color {
     }
 
     pub fn into_argb(self) -> u32 {
-        u32::from_le_bytes([self.a, self.r, self.g, self.b])
+        u32::from_be_bytes([self.a, self.r, self.g, self.b])
     }
 
     pub fn from_argb(argb: u32) -> Self {
-        let [a, r, g, b] = u32::to_le_bytes(argb);
+        let [a, r, g, b] = u32::to_be_bytes(argb);
         Self { r, g, b, a }
+    }
+
+    pub fn rotate_hue(self, rotate: f64) -> Self {
+        let mut rgb = colorsys::Rgb::from((self.r, self.g, self.b));
+        rgb.adjust_hue(rotate);
+        let rgb_arr: (u8, u8, u8) = rgb.into();
+        Self {
+            r: rgb_arr.0,
+            g: rgb_arr.1,
+            b: rgb_arr.2,
+            a: self.a,
+        }
+    }
+
+    pub fn blend(self, other: Self, factor: f32) -> Self {
+        let r = self.r_f32() + (other.r_f32() - self.r_f32()) * factor;
+        let g = self.g_f32() + (other.g_f32() - self.g_f32()) * factor;
+        let b = self.b_f32() + (other.b_f32() - self.b_f32()) * factor;
+        let a = self.a_f32() + (other.a_f32() - self.a_f32()) * factor;
+        Self::rgba(r, g, b, a)
     }
 
     pub const BLACK: Color = Color::rgb_const(0, 0, 0);

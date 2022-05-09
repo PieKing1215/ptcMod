@@ -191,7 +191,11 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
         match eve.kind {
             EventType::On => {
-                let color = colors[if dim { 1 } else { 0 }];
+                let mut color = colors[if dim { 1 } else { 0 }];
+
+                if COLORED_UNITS {
+                    color = color.rotate_hue(u as f64 * 25.0);
+                }
 
                 let x = (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x
                     + bounds.left;
