@@ -13,7 +13,7 @@ use crate::{
     },
     patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
 };
-use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND, HDC}}, um::winuser::{GetWindowDC, GetDC}};
+use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND}}};
 
 use super::{
     addr,
@@ -162,12 +162,6 @@ impl PTCVersion for PTC0925 {
 
     fn get_hwnd() -> &'static mut HWND {
         unsafe { &mut *(addr(0xDD4440 - 0xd30000) as *mut HWND) }
-    }
-
-    fn get_hdc() -> HDC {
-        unsafe {
-            GetDC(*Self::get_hwnd())
-        }
     }
 
     fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {

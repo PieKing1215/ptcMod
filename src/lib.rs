@@ -43,8 +43,6 @@ fn attach() -> anyhow::Result<()> {
 
         println!("attach");
         
-        let _gdiplus = gdiplus::GdiPlus::startup(None, None).unwrap();
-
         // need to get ptc version without depending on memory addresses since addresses change on different versions
         // unfortunately the code to get exe version with winapi is terrible
 

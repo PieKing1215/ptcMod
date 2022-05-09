@@ -1,7 +1,6 @@
-use std::mem::MaybeUninit;
 
 use colorsys::ColorTransform;
-use winapi::{um::{winuser::{self, ReleaseDC, GetClientRect}, d2d1::{D2D1_FACTORY_TYPE_SINGLE_THREADED, self, ID2D1Factory, ID2D1DCRenderTarget, D2D1_RENDER_TARGET_PROPERTIES, D2D1_RENDER_TARGET_TYPE_DEFAULT, D2D1_RENDER_TARGET_USAGE_NONE, D2D1_FEATURE_LEVEL_DEFAULT, D2D1_COLOR_F, ID2D1SolidColorBrush, D2D1_BRUSH_PROPERTIES, D2D1_MATRIX_3X2_F, D2D1MakeRotateMatrix, D2D1_RECT_F, D2D1_FACTORY_TYPE_MULTI_THREADED}, dcommon::{D2D1_PIXEL_FORMAT, D2D1_ALPHA_MODE_IGNORE}}, Interface, shared::{dxgiformat::DXGI_FORMAT_B8G8R8A8_UNORM, winerror}};
+use winapi::{um::{winuser::{self}}};
 
 use crate::{
     patch::Patch,
@@ -63,37 +62,6 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             );
             winutil::add_menu_toggle(menu, "Volume Fade", *M_VOLUME_FADE_ID, VOLUME_FADE, false);
             winutil::add_menu_toggle(menu, "Note Pulse", *M_NOTE_PULSE_ID, NOTE_PULSE, false);
-
-            // let mut factory: *mut ID2D1Factory = std::ptr::null_mut();
-            // let r1 = d2d1::D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED, &ID2D1Factory::uuidof(), std::ptr::null(), &mut factory as *mut _ as *mut _);
-
-            // if r1 == winerror::S_OK {
-
-
-            //     // let mut dcRenderTarget: *mut ID2D1DCRenderTarget = std::ptr::null_mut();
-            //     // let props = D2D1_RENDER_TARGET_PROPERTIES {
-            //     //     _type: D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            //     //     pixelFormat: D2D1_PIXEL_FORMAT {
-            //     //         format: DXGI_FORMAT_B8G8R8A8_UNORM,
-            //     //         alphaMode: D2D1_ALPHA_MODE_IGNORE,
-            //     //     },
-            //     //     dpiX: 0.0,
-            //     //     dpiY: 0.0,
-            //     //     usage: D2D1_RENDER_TARGET_USAGE_NONE,
-            //     //     minLevel: D2D1_FEATURE_LEVEL_DEFAULT,
-            //     // };
-            //     // let r2 = (&*factory).CreateDCRenderTarget(&props, &mut dcRenderTarget as *mut _ as *mut _);
-
-            //     // if r2 == winerror::S_OK {
-            //     //     println!("CreateDCRenderTarget success, dcRenderTarget@{dcRenderTarget:?}");
-            //     //     DCRT = Some(&mut *dcRenderTarget);
-            //     // } else {
-            //     //     println!("CreateDCRenderTarget failed {r2}");
-            //     // }
-            // } else {
-            //     println!("D2D1CreateFactory failed {r1}");
-            // }
-
         }
     }
 
@@ -101,6 +69,11 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
         unsafe {
             if let Err(e) = self.draw_unit_notes_patch.unapply() {
                 log::warn!("draw_unit_notes_patch: {:?}", e);
+            }
+
+            let draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
+            if let Some((_size, surf)) = SURF.take() {
+                draw.delete_attached_surface(surf);
             }
         }
     }
@@ -177,10 +150,11 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     let unit_height = 16;
 
-    let mut real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
+    let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
 
     if let Some((surf_size, _surf)) = SURF.as_ref() {
         if surf_size != unit_area {
+            real_draw.delete_attached_surface(SURF.take().unwrap().1);
             SURF = Some((*unit_area, &mut *ddraw::create_surface(*(addr(0xa7b20) as *mut *mut libc::c_void), unit_area.width(), unit_area.height())));
         }
     } else {
@@ -192,49 +166,6 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
     let highlighted = (0..unit_num).into_iter().map(|u| PTC::is_unit_highlighted(u)).collect::<Vec<_>>();
 
-    // log::debug!("GetDC");
-    // let hdc = draw.get_dc();
-
-    // if let Some(dcrt) = &mut DCRT {
-        // let start = std::time::Instant::now();
-        // let r = dcrt.BindDC(hdc, PTC::get_unit_rect().as_ptr().cast());
-        // log::debug!("aa {r} {:?}", std::time::Instant::now() - start);
-        // let start = std::time::Instant::now();
-        // dcrt.BeginDraw();
-        // log::debug!("ab {:?}", std::time::Instant::now() - start);
-
-        // let start = std::time::Instant::now();
-        // let mut transform: D2D1_MATRIX_3X2_F = std::mem::uninitialized();
-        // D2D1MakeRotateMatrix(0.0, winapi::um::dcommon::D2D_POINT_2F { x: 0.0, y: 0.0 }, &mut transform);
-
-        // let mut brush: *mut ID2D1SolidColorBrush = std::ptr::null_mut();
-        // dcrt.CreateSolidColorBrush(&D2D1_COLOR_F {
-        //     r: 1.0,
-        //     g: 0.0,
-        //     b: 1.0,
-        //     a: 1.0,
-        // }, &D2D1_BRUSH_PROPERTIES {
-        //     opacity: 1.0,
-        //     transform,
-        // }, &mut brush);
-        // log::debug!("ac {:?}", std::time::Instant::now() - start);
-
-    // log::debug!("Graphics::from_hdc");
-    // let mut gdi = gdiplus::Graphics::from_hdc(hdc);
-
-    // log::debug!("unwrap");
-    // let mut gdi = gdi.unwrap();
-
-    // log::debug!("drop");
-    // drop(gdi);
-
-    // log::debug!("draw");
-
-    // log::debug!("ReleaseDC");
-
-    // log::debug!("done");
-
-    let start = std::time::Instant::now();
     let events_list = PTC::get_event_list();
 
     let mut batch_a: Vec<(Rect<i32>, Color)> = Vec::new();
@@ -403,63 +334,18 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         eve_raw = eve.next;
     }
     
-    // log::debug!("b {:?} {bounds:?}", std::time::Instant::now() - start);
-        
-    // let start = std::time::Instant::now();
     if do_batching {
         for (rect, color) in batch_a {
-            // gdi
-            //     .with_brush(&mut gdiplus::SolidBrush::new(&gdiplus::Color::from(gdiplus::color::RED)).unwrap())
-            //     .fill_rectangle((rect.left as f32, rect.top as f32), (rect.right - rect.left) as f32, (rect.bottom - rect.top) as f32).unwrap();
-                
-            // dcrt.FillRectangle(&D2D1_RECT_F {
-            //     left: rect.left as f32,
-            //     top: rect.top as f32,
-            //     right: rect.right as f32,
-            //     bottom: rect.bottom as f32,
-            // }, brush.cast());
             draw.fill_rect(&rect, color);
         }
     }
-    // draw.fill_rect(&Rect::<i32>::new(0, 0, 1000, 1000), Color::RED);
-    // let rects = batch_a.into_iter().map(|rect| {
-    //     //(rect.left as f32, rect.top as f32), (rect.right - rect.left) as f32, (rect.bottom - rect.top) as f32
-    //     winapi::um::gdiplustypes::RectF { X: rect.left as f32, Y: rect.top as f32, Width: (rect.right - rect.left) as f32, Height: (rect.bottom - rect.top) as f32 }
-    // }).collect();
-    // log::debug!("c {:?}", std::time::Instant::now() - start);
-
-    // let start = std::time::Instant::now();
-    // gdi
-    //     .with_brush(&mut gdiplus::SolidBrush::new(&gdiplus::Color::from(gdiplus::color::RED)).unwrap())
-    //     .fill_rectangles(rects);
-    // log::debug!("d {:?}", std::time::Instant::now() - start);
-
-    // let start = std::time::Instant::now();
-    // let r = dcrt.EndDraw(std::ptr::null_mut(), std::ptr::null_mut());
-    // log::debug!("e {r} {:?}", std::time::Instant::now() - start);
-// }
-
-
-
-    // for rect in batch_a {
-    //     gdi
-    //         .with_brush(&mut gdiplus::SolidBrush::new(&gdiplus::Color::from(gdiplus::color::RED)).unwrap())
-    //         .fill_rectangle((rect.left as f32, rect.top as f32), (rect.right - rect.left) as f32, (rect.bottom - rect.top) as f32).unwrap();
-    // }
-
-    // ReleaseDC(*PTC::get_hwnd(), hdc);
-    // let start = std::time::Instant::now();
-    // draw.release_dc(hdc);
-    // log::debug!("e {:?}", std::time::Instant::now() - start);
 
     let mut ddbltfx = [0_u32; 25];
     ddbltfx[0] = 100;
     ddbltfx[23] = 0;
     ddbltfx[24] = 0;
 
-    // let start = std::time::Instant::now();
     real_draw.blt(PTC::get_unit_rect().as_mut_ptr().cast(), SURF.as_mut().unwrap().1, std::ptr::null_mut(), 0x00010000 | 0x1000000, ddbltfx.as_mut_ptr().cast());
-    // log::debug!("f {:?}", std::time::Instant::now() - start);
 
     // for u in 0..unit_num {
     //     if u * unit_height + unit_height >= *ofs_y

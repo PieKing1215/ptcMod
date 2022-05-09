@@ -12,7 +12,7 @@ build = "src/build.rs"
 [dependencies]
 process-memory = "0.4"
 sysinfo = { version = "0.23", default-features = false }
-winapi = { git = "https://github.com/Jarcho/winapi-rs", branch = "gdiplus", features = ["std", "handleapi", "libloaderapi", "memoryapi", "processthreadsapi", "winuser", "wincon", "synchapi", "winver", "ole2", "ddraw", "d2d1", "d3d9"] }
+winapi = { version = "0.3", features = ["std", "handleapi", "libloaderapi", "memoryapi", "processthreadsapi", "winuser", "wincon", "synchapi", "winver", "ole2", "ddraw", "d2d1", "d3d9"] }
 libc = { version = "0.2", features = ["use_std", "extra_traits"] }
 log = "0.4"
 simplelog = "0.12"
@@ -23,7 +23,6 @@ lazy_static = "1.4"
 regex = "1.5"
 reqwest = { version = "0.11", features = ["blocking"] }
 widestring = "0.5"
-gdiplus = { git = "https://github.com/PieKing1215/gdiplus-rs", branch = "ext" }
 
 [lib]
 name = "ptc_mod"

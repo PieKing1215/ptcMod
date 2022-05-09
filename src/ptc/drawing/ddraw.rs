@@ -1,4 +1,3 @@
-use std::arch::asm;
 
 use winapi::shared::{minwindef::DWORD, windef::{LPRECT, HDC}};
 
@@ -87,6 +86,19 @@ impl IDirectDrawSurface {
             blt_type: DWORD,
         ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x1c) as *const *const ()));
         (raw_fn)(self.raw, x, y, unknown, src, blt_type);
+    }
+
+    pub unsafe fn delete_attached_surface(
+        &self,
+        surface: *mut libc::c_void,
+    ) {
+        #[allow(clippy::ptr_as_ptr)]
+        let raw_fn: unsafe extern "stdcall" fn(
+            this: *mut libc::c_void,
+            unused: DWORD,
+            surface: *mut libc::c_void,
+        ) = std::mem::transmute(*((*(self.raw as *mut usize) + 0x20) as *const *const ()));
+        (raw_fn)(self.raw, 0, surface);
     }
 
     pub unsafe fn get_dc(&self) -> HDC {

@@ -1,5 +1,5 @@
 use widestring::U16CString;
-use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND, HDC}}, um::winuser::GetWindowDC};
+use winapi::{shared::{minwindef::HINSTANCE, windef::{HWND}}};
 
 use crate::{
     feature::{
@@ -133,12 +133,6 @@ impl PTCVersion for PTC09454 {
 
     fn get_hwnd() -> &'static mut HWND {
         unsafe { &mut *(addr(0xbddd0) as *mut HWND) }
-    }
-
-    fn get_hdc() -> HDC {
-        unsafe {
-            GetWindowDC(*Self::get_hwnd())
-        }
     }
 
     fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {

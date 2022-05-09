@@ -6,7 +6,7 @@ pub mod v09454;
 use std::path::PathBuf;
 
 use winapi::{
-    shared::{minwindef::HINSTANCE, windef::{HWND, HDC}},
+    shared::{minwindef::HINSTANCE, windef::{HWND}},
     um::libloaderapi::GetModuleHandleA,
 };
 
@@ -37,7 +37,6 @@ pub struct Selection {
 pub trait PTCVersion {
     fn get_features() -> Vec<Box<dyn Feature<Self>>>;
     fn get_hwnd() -> &'static mut HWND;
-    fn get_hdc() -> HDC;
     fn get_hinstance() -> &'static mut HINSTANCE;
     fn start_play();
     fn is_playing() -> bool;
