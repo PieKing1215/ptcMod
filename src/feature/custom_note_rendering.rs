@@ -7,7 +7,7 @@ use crate::{
     ptc::{
         addr,
         drawing::{color::Color, ddraw, Draw, Rect},
-        events::EventType,
+        events::{EventType, Event},
         PTCVersion,
     },
     winutil::{self, Menus},
@@ -133,6 +133,26 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
     }
 }
 
+pub unsafe fn get_value_at(now_pos: i32, kind: EventType, unit: i32, start: *mut Event, initial: i32) -> i32 {
+    let mut val = initial;
+    let mut eve_raw = start;
+    while !eve_raw.is_null() {
+        let eve = &mut *eve_raw;
+
+        if eve.clock > now_pos {
+            break;
+        }
+
+        if eve.unit == unit as u8 && eve.kind == kind {
+            val = eve.value;
+        }
+
+        eve_raw = eve.next;
+    }
+
+    val
+}
+
 // complete replacement for the vanilla unit notes drawing function
 // this allows for much easier modification
 #[allow(clippy::too_many_lines)]
@@ -164,7 +184,10 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     let mut draw = ddraw::IDirectDrawSurface::wrap(SURF.as_mut().unwrap().1);
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
+
     let highlighted = (0..unit_num).into_iter().map(|u| PTC::is_unit_highlighted(u)).collect::<Vec<_>>();
+    let mut cur_volume = (0..unit_num).into_iter().map(|_u| 104).collect::<Vec<_>>();
+    let mut cur_velocity = (0..unit_num).into_iter().map(|_u| 104).collect::<Vec<_>>();
 
     let events_list = PTC::get_event_list();
 
@@ -190,6 +213,12 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         let y = bounds.top + u * unit_height + unit_height / 2 - ofs_y;
 
         match eve.kind {
+            EventType::Volume => {
+                cur_volume[u as usize] = eve.value;
+            }
+            EventType::Velocity => {
+                cur_velocity[u as usize] = eve.value;
+            }
             EventType::On => {
                 let mut color = colors[if dim { 1 } else { 0 }];
 
@@ -203,6 +232,85 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     / beat_clock as i32)
                     - ofs_x
                     + bounds.left;
+
+                if PTC::is_playing() && (NOTE_PULSE || VOLUME_FADE) {
+                    if scroll_hook::ENABLED && x + unit_area.left <= scroll_hook::LAST_PLAYHEAD_POS {
+                        // left of note is to the left of the playhead
+            
+                        // TODO: clean up this logic
+                        let flash_strength = if dim { 0.4 } else { 0.8 };
+                        if x2 + unit_area.left >= scroll_hook::LAST_PLAYHEAD_POS {
+                            // right of note is to the right of the playhead (playhead is on the note)
+            
+                            if NOTE_PULSE {
+                                color = color.blend(Color::WHITE, flash_strength);
+                            }
+            
+                            if VOLUME_FADE {
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32 - unit_area.left) * beat_clock as i32 / *meas_width as i32;
+                                let volume: f32 = get_value_at(clock, EventType::Volume, u, eve_raw, cur_volume[u as usize]) as f32 / 104.0;
+                                let velocity: f32 = get_value_at(clock, EventType::Velocity, u, eve_raw, cur_velocity[u as usize]) as f32 / 104.0;
+            
+                                let factor = volume * velocity;
+                                let factor = factor.powf(0.25);
+            
+                                let fade_color = if dim {
+                                    Color::from_argb(0xff200040)
+                                } else {
+                                    Color::from_argb(0xff400070)
+                                };
+                                let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
+                                color = color.blend(fade_color, mix);
+                            }
+                        } else {
+                            // right of note is to the left of the playhead (playhead is past the note)
+            
+                            let fade_size = *PTC::get_measure_width() as i32 / 4;
+                            let fade_pt = scroll_hook::LAST_PLAYHEAD_POS - fade_size;
+            
+                            if NOTE_PULSE && x2 + unit_area.left >= fade_pt {
+                                let thru = (x2 + unit_area.left - fade_pt) as f32 / fade_size as f32;
+            
+                                color = color.blend(Color::WHITE, thru * flash_strength);
+                            }
+            
+                            if VOLUME_FADE {
+                                let clock = (ofs_x + x2) * beat_clock as i32 / *meas_width as i32;
+                                let volume: f32 = get_value_at(clock - 1, EventType::Volume, u, eve_raw, cur_volume[u as usize]) as f32 / 104.0;
+                                let velocity: f32 = get_value_at(clock - 1, EventType::Velocity, u, eve_raw, cur_velocity[u as usize]) as f32 / 104.0;
+            
+                                let factor = volume * velocity;
+                                let factor = factor.powf(0.25);
+
+                                let fade_color = if dim {
+                                    Color::from_argb(0xff200040)
+                                } else {
+                                    Color::from_argb(0xff400070)
+                                };
+                                let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
+                                color = color.blend(fade_color, mix);
+                            }
+                        }
+                    } else if VOLUME_FADE {
+                        // left of note is to the right of the playhead (note not played yet)
+            
+                        let fade_color = if dim {
+                            Color::from_argb(0xff200040)
+                        } else {
+                            Color::from_argb(0xff400070)
+                        };
+            
+                        let clock = (ofs_x + x) * beat_clock as i32 / *meas_width as i32;
+                        let volume: f32 = get_value_at(clock, EventType::Volume, u, eve_raw, cur_volume[u as usize]) as f32 / 104.0;
+                        let velocity: f32 = get_value_at(clock, EventType::Velocity, u, eve_raw, cur_velocity[u as usize]) as f32 / 104.0;
+            
+                        let factor = volume * velocity;
+                        let factor = factor.powf(0.25);
+            
+                        let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
+                        color = color.blend(fade_color, mix);
+                    }
+                }
 
                 let note_rect = Rect::<i32>::new(
                     (x + 2).max(bounds.left),
