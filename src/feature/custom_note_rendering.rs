@@ -157,6 +157,56 @@ pub unsafe fn get_value_at(
     val
 }
 
+pub unsafe fn get_event_at(
+    now_pos: i32,
+    kind: EventType,
+    unit: i32,
+    start: *mut Event,
+) -> Option<&'static Event> {
+    let mut val = None;
+    let mut eve_raw = start;
+    while !eve_raw.is_null() {
+        let eve = &mut *eve_raw;
+
+        if eve.clock > now_pos {
+            break;
+        }
+
+        if eve.unit == unit as u8 && eve.kind == kind {
+            val = Some(&*eve);
+        }
+
+        eve_raw = eve.next;
+    }
+
+    val
+}
+
+pub unsafe fn get_next_event(
+    cur_pos: i32,
+    max_pos: i32,
+    kind: EventType,
+    unit: i32,
+    start: *mut Event,
+) -> Option<&'static Event> {
+    let mut eve_raw = start;
+    while !eve_raw.is_null() {
+        let eve = &mut *eve_raw;
+
+        if eve.clock > max_pos {
+            break;
+        }
+
+        if eve.clock > cur_pos && eve.unit == unit as u8 && eve.kind == kind {
+            return Some(&*eve);
+        }
+
+        eve_raw = eve.next;
+    }
+
+    None
+}
+
 // complete replacement for the vanilla unit notes drawing function
 // this allows for much easier modification
 #[allow(clippy::too_many_lines)]
@@ -168,6 +218,10 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     let unit_area = &*PTC::get_unit_rect().as_ptr().cast::<Rect<i32>>();
     let bounds = Rect::<i32>::new(0, 0, unit_area.width(), unit_area.height());
+
+    if bounds.width() <= 0 || bounds.height() <= 0 {
+        return;
+    }
 
     let beat_clock = PTC::get_beat_clock();
     let unit_num = PTC::get_unit_num();
@@ -214,6 +268,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     let mut batch_a: Vec<(Rect<i32>, Color)> = Vec::new();
 
+    // TODO: this is stupid
     let do_batching = false;
 
     draw.fill_rect(&bounds, Color::from_argb(0xff000000));
@@ -242,6 +297,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
             }
             EventType::On => {
                 let mut color = colors[if dim { 1 } else { 0 }];
+                let mut highlight_color = colors[if dim { 1 } else { 0 }];
 
                 if COLORED_UNITS {
                     color = color.rotate_hue(u as f64 * 25.0);
@@ -253,6 +309,14 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     - ofs_x
                     + bounds.left;
 
+                let note_rect = Rect::<i32>::new(
+                    (x + 2).max(bounds.left),
+                    (y - 2).max(bounds.top),
+                    (x2 - 2).min(bounds.right),
+                    (y + 2).min(bounds.bottom),
+                );
+
+                let mut highlight_rect = None;
                 if PTC::is_playing() && (NOTE_PULSE || VOLUME_FADE) {
                     if scroll_hook::ENABLED && x + unit_area.left <= scroll_hook::LAST_PLAYHEAD_POS
                     {
@@ -264,7 +328,40 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                             // right of note is to the right of the playhead (playhead is on the note)
 
                             if NOTE_PULSE {
-                                color = color.blend(Color::WHITE, flash_strength);
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                    - unit_area.left)
+                                    * beat_clock as i32
+                                    / *meas_width as i32;
+
+                                highlight_color = color.blend(Color::WHITE, flash_strength);
+                                color = color.blend(Color::WHITE, flash_strength * 0.75);
+
+                                let prev_eve_key_clock = get_event_at(
+                                    clock,
+                                    EventType::Key,
+                                    u,
+                                    eve_raw
+                                ).map_or(eve.clock, |key| key.clock);
+                                
+                                let next_eve_key_clock = get_next_event(
+                                    clock,
+                                    eve.clock + eve.value,
+                                    EventType::Key,
+                                    u,
+                                    eve_raw
+                                ).map_or(eve.clock + eve.value, |key| key.clock);
+
+                                let x = (prev_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                                let x2 = (next_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+
+                                let note_rect = Rect::<i32>::new(
+                                    (x).max(bounds.left),
+                                    (y - 2).max(bounds.top),
+                                    (x2 - 1).min(bounds.right),
+                                    (y + 2).min(bounds.bottom),
+                                );
+
+                                highlight_rect = Some(note_rect);
                             }
 
                             if VOLUME_FADE {
@@ -299,6 +396,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                                 };
                                 let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
                                 color = color.blend(fade_color, mix);
+                                highlight_color = highlight_color.blend(fade_color, mix);
                             }
                         } else {
                             // right of note is to the left of the playhead (playhead is past the note)
@@ -310,7 +408,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                                 let thru =
                                     (x2 + unit_area.left - fade_pt) as f32 / fade_size as f32;
 
-                                color = color.blend(Color::WHITE, thru * flash_strength);
+                                color = color.blend(Color::WHITE, thru * flash_strength * 0.75);
                             }
 
                             if VOLUME_FADE {
@@ -379,17 +477,18 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     }
                 }
 
-                let note_rect = Rect::<i32>::new(
-                    (x + 2).max(bounds.left),
-                    (y - 2).max(bounds.top),
-                    (x2 - 2).min(bounds.right),
-                    (y + 2).min(bounds.bottom),
-                );
-
                 if do_batching {
                     batch_a.push((note_rect, color));
                 } else {
                     draw.fill_rect(&note_rect, color);
+                }
+
+                if let Some(hl) = highlight_rect {
+                    if do_batching {
+                        batch_a.push((hl, highlight_color));
+                    } else {
+                        draw.fill_rect(&hl, highlight_color);
+                    }
                 }
 
                 if x > bounds.left - 2 {
