@@ -10,6 +10,8 @@ There is a chance it could explode your ptCollage at any moment and it has not b
 I would recommend not actually using this while composing right now.<br>
 If you must, save often and make some backups - if it randomly segfaults or something your unsaved changes will be very lost.
 
+ptcMod may be flagged by antiviruses as a side effect of how it works. The way ptcMod injects into ptCollage is similar to how some viruses hook other processes, and some antiviruses will detect this. Obviously I can say this repo (PieKing1215/ptcMod) and official builds do not actually contain malware, but if you want to be sure, look over the code and [build from source](https://github.com/PieKing1215/ptcMod/wiki/Building).
+
 ## Support
 The goal is to continuously support at least both ptCollage 0.9.2.5 and whatever the latest version is.<br>
 Currently 0.9.2.5 and 0.9.4.54 (-> https://github.com/PieKing1215/ptcMod/issues/22) are fully supported.
