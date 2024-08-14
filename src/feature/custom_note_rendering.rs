@@ -28,14 +28,19 @@ static mut COLORED_UNITS: bool = true;
 
 // static mut DCRT: Option<&'static mut ID2D1DCRenderTarget> = None;
 static mut SURF: Option<(Rect<i32>, &'static mut libc::c_void)> = None;
+static mut SURF_KB: Option<(Rect<i32>, &'static mut libc::c_void)> = None;
 
 pub struct CustomNoteRendering {
     draw_unit_notes_patch: Patch,
+    draw_kb_notes_patch: Patch,
 }
 
 impl CustomNoteRendering {
-    pub fn new<PTC: PTCVersion>(draw_unit_notes_patch: Patch) -> Self {
-        Self { draw_unit_notes_patch }
+    pub fn new<PTC: PTCVersion>(draw_unit_notes_patch: Patch, draw_kb_notes_patch: Patch) -> Self {
+        Self {
+            draw_unit_notes_patch,
+            draw_kb_notes_patch,
+        }
     }
 }
 
@@ -69,8 +74,15 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 log::warn!("draw_unit_notes_patch: {:?}", e);
             }
 
+            if let Err(e) = self.draw_kb_notes_patch.unapply() {
+                log::warn!("draw_kb_notes_patch: {:?}", e);
+            }
+
             let draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
             if let Some((_size, surf)) = SURF.take() {
+                draw.delete_attached_surface(surf);
+            }
+            if let Some((_size, surf)) = SURF_KB.take() {
                 draw.delete_attached_surface(surf);
             }
         }
@@ -86,6 +98,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 if low == *M_CUSTOM_RENDERING_ENABLED_ID {
                     if winutil::menu_toggle(msg.hwnd, *M_CUSTOM_RENDERING_ENABLED_ID) {
                         unsafe { self.draw_unit_notes_patch.apply() }.unwrap();
+                        unsafe { self.draw_kb_notes_patch.apply() }.unwrap();
 
                         unsafe {
                             winutil::set_menu_enabled(
@@ -98,6 +111,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, true);
                     } else {
                         unsafe { self.draw_unit_notes_patch.unapply() }.unwrap();
+                        unsafe { self.draw_kb_notes_patch.unapply() }.unwrap();
 
                         winutil::set_menu_enabled(msg.hwnd, *M_NOTE_PULSE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
@@ -817,4 +831,525 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     //     let volume = (get_event_value)(x, unit as i32, 0x5);
     //     (draw_rect)([x, 256 - volume, x + 1, 256].as_ptr(), 0xff0000);
     // }
+}
+
+
+// complete replacement for the vanilla keyboard notes drawing function
+// this allows for much easier modification
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::field_reassign_with_default)]
+pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
+    let meas_width = PTC::get_measure_width();
+    let ofs_x = PTC::get_kb_scroll_ofs_x();
+    let ofs_y = PTC::get_kb_scroll_ofs_y();
+
+    let unit_area = &*PTC::get_kb_rect().as_ptr().cast::<Rect<i32>>();
+    let bounds = Rect::<i32>::new(0, 0, unit_area.width(), unit_area.height());
+
+    if bounds.width() <= 0 || bounds.height() <= 0 {
+        return;
+    }
+
+    let beat_clock = PTC::get_beat_clock();
+    let unit_num = PTC::get_unit_num();
+
+    let unit_height = 16;
+
+    let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
+
+    if let Some((surf_size, _surf)) = SURF_KB.as_ref() {
+        if surf_size != unit_area {
+            real_draw.delete_attached_surface(SURF_KB.take().unwrap().1);
+            SURF_KB = Some((
+                *unit_area,
+                &mut *ddraw::create_surface(
+                    *(addr(0xa7b20) as *mut *mut libc::c_void),
+                    unit_area.width(),
+                    unit_area.height(),
+                ),
+            ));
+        }
+    } else {
+        SURF_KB = Some((
+            *unit_area,
+            &mut *ddraw::create_surface(
+                *(addr(0xa7b20) as *mut *mut libc::c_void),
+                unit_area.width(),
+                unit_area.height(),
+            ),
+        ));
+    }
+
+    let mut draw = ddraw::IDirectDrawSurface::wrap(SURF_KB.as_mut().unwrap().1);
+
+    let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
+
+    let highlighted = (0..unit_num)
+        .into_iter()
+        .map(|u| PTC::is_unit_highlighted(u))
+        .collect::<Vec<_>>();
+    let mut cur_volume = (0..unit_num).into_iter().map(|_u| 104).collect::<Vec<_>>();
+    let mut cur_velocity = (0..unit_num).into_iter().map(|_u| 104).collect::<Vec<_>>();
+
+    let events_list = PTC::get_event_list();
+
+    let mut batch_a: Vec<(Rect<i32>, Color)> = Vec::new();
+
+    // TODO: this is stupid
+    let do_batching = false;
+
+    draw.fill_rect(&bounds, Color::from_argb(0xff000000));
+
+    let mut cur_y = (0..unit_num)
+        .into_iter()
+        .map(|_u| (0x6C00 - 0x4500) * unit_height / 0x100 + unit_height/2)
+        .collect::<Vec<_>>();
+
+    let mut eve_raw = events_list.start;
+    while !eve_raw.is_null() {
+        let eve = &mut *eve_raw;
+
+        let x = (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+
+        if x > bounds.right {
+            break;
+        }
+
+        let u = eve.unit as i32;
+
+        let dim = !highlighted[u as usize];
+        
+        if dim {
+            eve_raw = eve.next;
+            continue;
+        }
+
+        let y = bounds.top + cur_y[u as usize] - ofs_y;
+
+        match eve.kind {
+            EventType::Volume => {
+                cur_volume[u as usize] = eve.value;
+            }
+            EventType::Velocity => {
+                cur_velocity[u as usize] = eve.value;
+            }
+            EventType::On => {
+                let mut color = colors[if dim { 1 } else { 0 }];
+                let mut highlight_color = colors[if dim { 1 } else { 0 }];
+
+                if COLORED_UNITS {
+                    color = color.rotate_hue(u as f64 * 25.0);
+                }
+
+                let x =
+                    (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                let x2 = ((eve.clock + eve.value) * (*meas_width as i32) / beat_clock as i32)
+                    - ofs_x
+                    + bounds.left;
+
+                let note_rect = Rect::<i32>::new(
+                    (x).max(bounds.left),
+                    (y - 4).max(bounds.top),
+                    (x2).min(bounds.right),
+                    (y + 4).min(bounds.bottom),
+                );
+
+                let mut highlight_rect = None;
+                if PTC::is_playing() && (NOTE_PULSE || VOLUME_FADE) {
+                    if scroll_hook::ENABLED && x + unit_area.left <= scroll_hook::LAST_PLAYHEAD_POS
+                    {
+                        // left of note is to the left of the playhead
+
+                        // TODO: clean up this logic
+                        let flash_strength = if dim { 0.4 } else { 0.8 };
+                        if x2 + unit_area.left >= scroll_hook::LAST_PLAYHEAD_POS {
+                            // right of note is to the right of the playhead (playhead is on the note)
+
+                            if NOTE_PULSE {
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                    - unit_area.left)
+                                    * beat_clock as i32
+                                    / *meas_width as i32;
+
+                                highlight_color = color.blend(Color::WHITE, flash_strength);
+                                color = color.blend(Color::WHITE, flash_strength * 0.75);
+
+                                let (prev_eve_key_clock, prev_eve_key_value) = get_event_at(
+                                    clock,
+                                    EventType::Key,
+                                    u,
+                                    eve_raw
+                                ).map_or((eve.clock, eve.value), |key| (key.clock, key.value));
+                                
+                                let next_eve_key_clock = get_next_event(
+                                    clock,
+                                    eve.clock + eve.value,
+                                    EventType::Key,
+                                    u,
+                                    eve_raw
+                                ).map_or(eve.clock + eve.value, |key| key.clock);
+
+                                let x = (prev_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                                let x2 = (next_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                                let note = (0x6C00 - 0x4500 - (prev_eve_key_value - 0x6000)) / 0x100 * unit_height + unit_height / 2;
+                                let y = bounds.top + note - ofs_y;
+
+                                let note_rect = Rect::<i32>::new(
+                                    (x).max(bounds.left),
+                                    (y - 4).max(bounds.top),
+                                    (x2).min(bounds.right),
+                                    (y + 4).min(bounds.bottom),
+                                );
+
+                                highlight_rect = Some(note_rect);
+                            }
+
+                            if VOLUME_FADE {
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                    - unit_area.left)
+                                    * beat_clock as i32
+                                    / *meas_width as i32;
+                                let volume: f32 = get_value_at(
+                                    clock,
+                                    EventType::Volume,
+                                    u,
+                                    eve_raw,
+                                    cur_volume[u as usize],
+                                ) as f32
+                                    / 104.0;
+                                let velocity: f32 = get_value_at(
+                                    clock,
+                                    EventType::Velocity,
+                                    u,
+                                    eve_raw,
+                                    cur_velocity[u as usize],
+                                ) as f32
+                                    / 104.0;
+
+                                let factor = volume * velocity;
+                                let factor = factor.powf(0.25);
+
+                                let fade_color = if dim {
+                                    Color::from_argb(0xff200040)
+                                } else {
+                                    Color::from_argb(0xff400070)
+                                };
+                                let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
+                                color = color.blend(fade_color, mix);
+                                highlight_color = highlight_color.blend(fade_color, mix);
+                            }
+                        } else {
+                            // right of note is to the left of the playhead (playhead is past the note)
+
+                            let fade_size = *PTC::get_measure_width() as i32 / 4;
+                            let fade_pt = scroll_hook::LAST_PLAYHEAD_POS - fade_size;
+
+                            if NOTE_PULSE && x2 + unit_area.left >= fade_pt {
+                                let thru =
+                                    (x2 + unit_area.left - fade_pt) as f32 / fade_size as f32;
+
+                                color = color.blend(Color::WHITE, thru * flash_strength * 0.75);
+                            }
+
+                            if VOLUME_FADE {
+                                let clock = (ofs_x + x2) * beat_clock as i32 / *meas_width as i32;
+                                let volume: f32 = get_value_at(
+                                    clock - 1,
+                                    EventType::Volume,
+                                    u,
+                                    eve_raw,
+                                    cur_volume[u as usize],
+                                ) as f32
+                                    / 104.0;
+                                let velocity: f32 = get_value_at(
+                                    clock - 1,
+                                    EventType::Velocity,
+                                    u,
+                                    eve_raw,
+                                    cur_velocity[u as usize],
+                                ) as f32
+                                    / 104.0;
+
+                                let factor = volume * velocity;
+                                let factor = factor.powf(0.25);
+
+                                let fade_color = if dim {
+                                    Color::from_argb(0xff200040)
+                                } else {
+                                    Color::from_argb(0xff400070)
+                                };
+                                let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
+                                color = color.blend(fade_color, mix);
+                            }
+                        }
+                    } else if VOLUME_FADE {
+                        // left of note is to the right of the playhead (note not played yet)
+
+                        let fade_color = if dim {
+                            Color::from_argb(0x00000001)
+                        } else {
+                            Color::from_argb(0x00000000)
+                        };
+
+                        let clock = (ofs_x + x) * beat_clock as i32 / *meas_width as i32;
+                        let volume: f32 = get_value_at(
+                            clock,
+                            EventType::Volume,
+                            u,
+                            eve_raw,
+                            cur_volume[u as usize],
+                        ) as f32
+                            / 104.0;
+                        let velocity: f32 = get_value_at(
+                            clock,
+                            EventType::Velocity,
+                            u,
+                            eve_raw,
+                            cur_velocity[u as usize],
+                        ) as f32
+                            / 104.0;
+
+                        let factor = volume * velocity;
+                        let factor = factor.powf(0.25);
+
+                        let mix = (1.0 - factor * 0.8 - 0.2).clamp(0.0, 1.0);
+                        color = color.blend(fade_color, mix);
+                    }
+                }
+
+                if do_batching {
+                    batch_a.push((note_rect, color));
+                } else {
+
+                    let mut cur_eve: &Event = eve;
+                    let mut next_key = cur_y[u as usize];
+                    #[allow(clippy::while_let_loop)]
+                    loop {
+                        if let Some(next_eve_key) = get_next_event(
+                            cur_eve.clock,
+                            eve.clock + eve.value,
+                            EventType::Key,
+                            u,
+                            eve_raw
+                        ) {
+                            let x =
+                                (cur_eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                            let x2 = ((next_eve_key.clock) * (*meas_width as i32) / beat_clock as i32)
+                                - ofs_x
+                                + bounds.left;
+
+                            let y = bounds.top + next_key - ofs_y;
+                                
+                            let note_rect = Rect::<i32>::new(
+                                (x).max(bounds.left),
+                                (y - 4).max(bounds.top),
+                                (x2).min(bounds.right),
+                                (y + 4).min(bounds.bottom),
+                            );
+                            draw.fill_rect(&note_rect, color);
+
+                            next_key = (0x6C00 - 0x4500 - (next_eve_key.value - 0x6000)) / 0x100 * unit_height + unit_height / 2;
+                            cur_eve = next_eve_key;
+                        } else {
+                            let x =
+                                (cur_eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                            let x2 = ((eve.clock + eve.value) * (*meas_width as i32) / beat_clock as i32)
+                                - ofs_x
+                                + bounds.left;
+
+                            let y = bounds.top + next_key - ofs_y;
+                                
+                            let note_rect = Rect::<i32>::new(
+                                (x).max(bounds.left),
+                                (y - 4).max(bounds.top),
+                                (x2).min(bounds.right),
+                                (y + 4).min(bounds.bottom),
+                            );
+                            draw.fill_rect(&note_rect, color);
+                            break;
+                        }
+                    }
+
+                }
+
+                if let Some(hl) = highlight_rect {
+                    if do_batching {
+                        batch_a.push((hl, highlight_color));
+                    } else {
+                        draw.fill_rect(&hl, highlight_color);
+                    }
+                }
+
+                // if x > bounds.left - 2 {
+                //     if do_batching {
+                //         batch_a.push((
+                //             Rect::<i32>::new(
+                //                 note_rect.left - 1,
+                //                 note_rect.top - 1,
+                //                 note_rect.left,
+                //                 note_rect.bottom + 1,
+                //             ),
+                //             color,
+                //         ));
+                //     } else {
+                //         draw.fill_rect(
+                //             &Rect::<i32>::new(
+                //                 note_rect.left - 1,
+                //                 note_rect.top - 1,
+                //                 note_rect.left,
+                //                 note_rect.bottom + 1,
+                //             ),
+                //             color,
+                //         );
+                //     }
+
+                //     // left edge
+                //     if do_batching {
+                //         batch_a.push((
+                //             Rect::<i32>::new(
+                //                 note_rect.left - 1,
+                //                 note_rect.top - 1,
+                //                 note_rect.left,
+                //                 note_rect.bottom + 1,
+                //             ),
+                //             color,
+                //         ));
+                //     } else {
+                //         draw.fill_rect(
+                //             &Rect::<i32>::new(
+                //                 note_rect.left - 1,
+                //                 note_rect.top - 1,
+                //                 note_rect.left,
+                //                 note_rect.bottom + 1,
+                //             ),
+                //             color,
+                //         );
+                //     }
+
+                //     if do_batching {
+                //         batch_a.push((
+                //             Rect::<i32>::new(
+                //                 note_rect.left - 2,
+                //                 note_rect.top - 3,
+                //                 note_rect.left - 1,
+                //                 note_rect.bottom + 3,
+                //             ),
+                //             color,
+                //         ));
+                //     } else {
+                //         draw.fill_rect(
+                //             &Rect::<i32>::new(
+                //                 note_rect.left - 2,
+                //                 note_rect.top - 3,
+                //                 note_rect.left - 1,
+                //                 note_rect.bottom + 3,
+                //             ),
+                //             color,
+                //         );
+                //     }
+                // }
+
+                // if note_rect.right > bounds.left {
+                //     // right edge
+                //     if do_batching {
+                //         batch_a.push((
+                //             Rect::<i32>::new(
+                //                 note_rect.right,
+                //                 note_rect.top,
+                //                 note_rect.right + 1,
+                //                 note_rect.bottom,
+                //             ),
+                //             color,
+                //         ));
+                //     } else {
+                //         draw.fill_rect(
+                //             &Rect::<i32>::new(
+                //                 note_rect.right,
+                //                 note_rect.top,
+                //                 note_rect.right + 1,
+                //                 note_rect.bottom,
+                //             ),
+                //             color,
+                //         );
+                //     }
+
+                //     if do_batching {
+                //         batch_a.push((
+                //             Rect::<i32>::new(
+                //                 note_rect.right + 1,
+                //                 note_rect.top + 1,
+                //                 note_rect.right + 2,
+                //                 note_rect.bottom - 1,
+                //             ),
+                //             color,
+                //         ));
+                //     } else {
+                //         draw.fill_rect(
+                //             &Rect::<i32>::new(
+                //                 note_rect.right + 1,
+                //                 note_rect.top + 1,
+                //                 note_rect.right + 2,
+                //                 note_rect.bottom - 1,
+                //             ),
+                //             color,
+                //         );
+                //     }
+                // }
+            }
+            EventType::Key => {
+                cur_y[u as usize] = (0x6C00 - 0x4500 - (eve.value - 0x6000)) / 0x100 * unit_height + unit_height / 2;
+
+                // let fade_color = if dim {
+                //     Color::from_argb(0xff200040)
+                // } else {
+                //     Color::from_argb(0xff400070)
+                // };
+
+                // let x =
+                //     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                // if x > bounds.left - 2 {
+                //     if do_batching {
+                //         batch_a.push((Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color));
+                //         batch_a.push((Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color));
+                //     } else {
+                //         draw.fill_rect(&Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color);
+                //         draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
+                //     }
+                // }
+            }
+            EventType::Velocity | EventType::Key => {}
+            _ => {
+                // let x =
+                //     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                // if x > bounds.left - 2 {
+                //     let color = Color::from_argb([0xff00f080, 0x007840][if dim { 1 } else { 0 }]);
+                //     if do_batching {
+                //         batch_a.push((Rect::<i32>::new(x, y + 4, x + 2, y + 6), color));
+                //     } else {
+                //         draw.fill_rect(&Rect::<i32>::new(x, y + 4, x + 2, y + 6), color);
+                //     }
+                // }
+            }
+        }
+
+        eve_raw = eve.next;
+    }
+
+    if do_batching {
+        for (rect, color) in batch_a {
+            draw.fill_rect(&rect, color);
+        }
+    }
+    let mut ddbltfx = [0_u32; 25];
+    ddbltfx[0] = 100;
+    ddbltfx[23] = 0;
+    ddbltfx[24] = 0;
+
+    real_draw.blt(
+        PTC::get_kb_rect().as_mut_ptr().cast(),
+        SURF_KB.as_mut().unwrap().1,
+        std::ptr::null_mut(),
+        0x00010000 | 0x1000000,
+        ddbltfx.as_mut_ptr().cast(),
+    );
 }

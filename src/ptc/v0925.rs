@@ -122,7 +122,15 @@ impl PTCVersion for PTC0925 {
             custom_note_rendering::draw_unit_notes::<PTC0925>
         );
 
-        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(draw_unit_notes);
+        let draw_kb_notes = replace!(
+            0x16644,
+            0xf370,
+            "stdcall",
+            fn(),
+            custom_note_rendering::draw_kb_notes::<PTC0925>
+        );
+
+        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(draw_unit_notes, draw_kb_notes);
 
         // playhead
 
@@ -263,6 +271,10 @@ impl PTCVersion for PTC0925 {
         unsafe { *(addr(0xa6cbc) as *const [i32; 4]) }
     }
 
+    fn get_kb_rect() -> [i32; 4] {
+        unsafe { *(addr(0xa6a68) as *const [i32; 4]) }
+    }
+
     fn get_event_list() -> &'static mut super::events::EventList {
         unsafe { &mut **((*(addr(0xa4430) as *mut usize) + 160) as *mut *mut EventList) }
     }
@@ -319,6 +331,14 @@ impl PTCVersion for PTC0925 {
 
     fn get_unit_scroll_ofs_y() -> &'static i32 {
         unsafe { &*(addr(0xa6ec0 + 0x14) as *mut i32) }
+    }
+
+    fn get_kb_scroll_ofs_x() -> &'static i32 {
+        unsafe { &*(addr(0xa6d70 + 0x14) as *mut i32) }
+    }
+
+    fn get_kb_scroll_ofs_y() -> &'static i32 {
+        unsafe { &*(addr(0xa6f30 + 0x14) as *mut i32) }
     }
 
     fn get_unit_num() -> i32 {

@@ -53,11 +53,14 @@ pub trait PTCVersion {
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
     fn get_unit_rect() -> [i32; 4];
+    fn get_kb_rect() -> [i32; 4];
     fn get_event_list() -> &'static mut EventList;
     fn is_unit_highlighted(unit_no: i32) -> bool;
     fn get_selected_range() -> Selection;
     fn get_unit_scroll_ofs_x() -> &'static i32;
     fn get_unit_scroll_ofs_y() -> &'static i32;
+    fn get_kb_scroll_ofs_x() -> &'static i32;
+    fn get_kb_scroll_ofs_y() -> &'static i32;
     fn get_unit_num() -> i32;
     fn get_events_for_unit(unit_no: i32) -> &'static [Event];
 

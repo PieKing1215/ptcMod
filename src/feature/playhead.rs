@@ -78,10 +78,11 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
 pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
     if scroll_hook::ENABLED && PTC::is_playing() && *PTC::get_tab() > 0 {
         let unit_rect = PTC::get_unit_rect();
+        let kb_rect = PTC::get_kb_rect();
 
         let x = crate::feature::scroll_hook::LAST_PLAYHEAD_POS;
 
-        let rect = [x, unit_rect[1], x + 2, unit_rect[3]];
+        let rect = [x, unit_rect[1].min(kb_rect[1]), x + 2, unit_rect[3].max(kb_rect[3])];
         PTC::draw_rect(rect, 0xffcccccc);
     }
 }

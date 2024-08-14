@@ -240,6 +240,10 @@ impl PTCVersion for PTC09454 {
         }
     }
 
+    fn get_kb_rect() -> [i32; 4] {
+        todo!()
+    }
+
     fn get_event_list() -> &'static mut super::events::EventList {
         todo!()
     }
@@ -249,6 +253,30 @@ impl PTCVersion for PTC09454 {
     }
 
     fn get_selected_range() -> Selection {
+        todo!()
+    }
+
+    fn get_unit_scroll_ofs_x() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_unit_scroll_ofs_y() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_kb_scroll_ofs_x() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_kb_scroll_ofs_y() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_unit_num() -> i32 {
+        todo!()
+    }
+
+    fn get_events_for_unit(_unit_no: i32) -> &'static [super::events::Event] {
         todo!()
     }
 
@@ -428,22 +456,6 @@ impl PTCVersion for PTC09454 {
     }
 
     fn volume_adjust_fill_selected_units(_hwnd: HWND) -> bool {
-        todo!()
-    }
-
-    fn get_unit_scroll_ofs_x() -> &'static i32 {
-        todo!()
-    }
-
-    fn get_unit_scroll_ofs_y() -> &'static i32 {
-        todo!()
-    }
-
-    fn get_unit_num() -> i32 {
-        todo!()
-    }
-
-    fn get_events_for_unit(_unit_no: i32) -> &'static [super::events::Event] {
         todo!()
     }
 }
