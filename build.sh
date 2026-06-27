@@ -1,0 +1,1 @@
+cargo xwin build --target i686-pc-windows-msvc --release --xwin-arch=x86

@@ -7,3 +7,5 @@
 cargo-timing*.html
 *.gpr
 *.rep/
+
+build_cp.sh
