@@ -1,5 +1,5 @@
 use colorsys::ColorTransform;
-use winapi::um::winuser::{self};
+use winapi::{shared::windef::{LPRECT, RECT}, um::winuser::{self}};
 
 use crate::{
     patch::Patch,
@@ -246,6 +246,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     if let Some((surf_size, _surf)) = SURF.as_ref() {
         if surf_size != unit_area {
+            println!("unit area resized");
             real_draw.delete_attached_surface(SURF.take().unwrap().1);
             SURF = Some((
                 *unit_area,
@@ -257,6 +258,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
             ));
         }
     } else {
+        println!("creating unit area surface");
         SURF = Some((
             *unit_area,
             &mut *ddraw::create_surface(
@@ -664,19 +666,39 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         }
     }
 
-    let mut ddbltfx = [0_u32; 25];
-    ddbltfx[0] = 100;
-    ddbltfx[23] = 0;
-    ddbltfx[24] = 0;
+    // let mut ddbltfx = [0_u32; 25];
+    // ddbltfx[0] = 100;
+    // ddbltfx[23] = 0;
+    // ddbltfx[24] = 0;
 
-    real_draw.blt(
-        PTC::get_unit_rect().as_mut_ptr().cast(),
+    // real_draw.blt(
+    //     PTC::get_unit_rect().as_mut_ptr().cast(),
+    //     SURF.as_mut().unwrap().1,
+    //     std::ptr::null_mut(),
+    //     0x00010000 | 0x1000000,
+    //     ddbltfx.as_mut_ptr().cast(),
+    // );
+
+    let dst_rect: LPRECT = PTC::get_unit_rect().as_mut_ptr().cast();
+    let mut src_rect: RECT = RECT {
+        left: 0,
+        top: 0,
+        right: bounds.width(),
+        bottom: bounds.height(),
+    };
+
+    const DDBLTFAST_NOCOLORKEY: u32 = 0x00000000;
+    const DDBLTFAST_SRCCOLORKEY: u32 = 0x00000001;
+    const DDBLTFAST_DESTCOLORKEY: u32 = 0x00000002;
+    const DDBLTFAST_WAIT: u32 = 0x00000010;
+
+    real_draw.blt_fast(
+        (*dst_rect).left as u32,
+        (*dst_rect).top as u32,
         SURF.as_mut().unwrap().1,
-        std::ptr::null_mut(),
-        0x00010000 | 0x1000000,
-        ddbltfx.as_mut_ptr().cast(),
+        &raw mut src_rect,
+        DDBLTFAST_SRCCOLORKEY,
     );
-
 }
 
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
