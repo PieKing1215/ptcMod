@@ -218,22 +218,21 @@ impl PTCVersion for PTC0925 {
 
     fn get_beat_num() -> &'static mut u32 {
         unsafe {
-            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x98) as *mut usize) + 0x10)
+            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize))
                 as *mut u32)
         }
     }
 
     fn get_tempo() -> &'static mut f32 {
         unsafe {
-            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x98) as *mut usize)
-                + 0x10
+            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize)
                 + 0x4) as *mut f32)
         }
     }
 
     fn get_beat_clock() -> u32 {
         unsafe {
-            *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x98) as *mut usize) + 0x10 + 0x8)
+            *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize) + 0x8)
                 as *mut u32)
         }
     }
