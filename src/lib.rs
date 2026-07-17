@@ -10,7 +10,6 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::missing_safety_doc)]
-#![allow(static_mut_refs)] // TODO
 
 use std::convert::TryInto;
 

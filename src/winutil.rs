@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{cell::Cell, collections::HashMap, ffi::CString};
+use std::{collections::HashMap, ffi::CString, sync::atomic::AtomicU16};
 
 use winapi::{
     shared::windef::{HMENU, HWND},
@@ -10,13 +10,10 @@ use winapi::{
 use crate::ptc::PTCVersion;
 
 // system for assigning globally unique menu ids without hardcoded constants
-static mut MENU_ID_COUNTER: Cell<u16> = Cell::new(1000);
+static MENU_ID_COUNTER: AtomicU16 = AtomicU16::new(1000);
 
 pub(crate) fn next_id() -> u16 {
-    unsafe {
-        MENU_ID_COUNTER.set(MENU_ID_COUNTER.get() + 1);
-        MENU_ID_COUNTER.get()
-    }
+    MENU_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
 }
 
 pub struct Menus {

@@ -1,7 +1,7 @@
 use std::{
     convert::TryInto,
     mem::MaybeUninit,
-    sync::{mpsc::Sender, LazyLock},
+    sync::{mpsc::Sender, LazyLock, OnceLock},
 };
 
 use log::LevelFilter;
@@ -32,7 +32,9 @@ enum MsgType {
     WinMsg(winuser::MSG),
 }
 
-static mut SENDER: Option<Sender<MsgType>> = None;
+unsafe impl Send for MsgType {}
+
+static SENDER: OnceLock<Sender<MsgType>> = OnceLock::new();
 
 pub struct Runtime<PTC: PTCVersion + ?Sized> {
     features: Vec<Box<dyn Feature<PTC>>>,
@@ -130,7 +132,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
 
             let window_thread = winuser::GetWindowThreadProcessId(*hwnd, std::ptr::null_mut());
             let (tx, rx) = std::sync::mpsc::channel::<MsgType>();
-            SENDER = Some(tx);
+            SENDER.set(tx).unwrap();
             let event_hook = winuser::SetWindowsHookExW(
                 winuser::WH_GETMESSAGE,
                 Some(hook_ex),
@@ -207,7 +209,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                         0,
                     );
                 } else if low == *M_UNINJECT_ID {
-                    SENDER.as_mut().unwrap().send(MsgType::Uninject).unwrap();
+                    SENDER.get().unwrap().send(MsgType::Uninject).unwrap();
                 }
             }
         }
@@ -225,7 +227,7 @@ unsafe extern "system" fn hook_ex(code: i32, w_param: usize, l_param: isize) -> 
         // need to copy since we handle this on the main thread, so the pointer will be gone
         // (not sure if this is really safe or not)
         let msg = *(l_param as *const winuser::MSG);
-        SENDER.as_mut().unwrap().send(MsgType::WinMsg(msg)).unwrap();
+        SENDER.get().unwrap().send(MsgType::WinMsg(msg)).unwrap();
     }
 
     winuser::CallNextHookEx(std::ptr::null_mut(), code, w_param, l_param)

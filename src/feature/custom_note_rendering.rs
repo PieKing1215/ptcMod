@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::sync::{LazyLock, RwLock};
 
 use colorsys::ColorTransform;
 use winapi::{
@@ -34,8 +34,8 @@ static mut VOLUME_FADE: bool = true;
 static mut COLORED_UNITS: bool = true;
 
 // static mut DCRT: Option<&'static mut ID2D1DCRenderTarget> = None;
-static mut SURF: Option<(Rect<i32>, &'static mut libc::c_void)> = None;
-static mut SURF_KB: Option<(Rect<i32>, &'static mut libc::c_void)> = None;
+static SURF: RwLock<Option<(Rect<i32>, &'static mut libc::c_void)>> = RwLock::new(None);
+static SURF_KB: RwLock<Option<(Rect<i32>, &'static mut libc::c_void)>> = RwLock::new(None);
 
 pub struct CustomNoteRendering {
     draw_unit_notes_patch: Patch,
@@ -83,10 +83,10 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             }
 
             let draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
-            if let Some((_size, surf)) = SURF.take() {
+            if let Some((_size, surf)) = SURF.try_write().unwrap().take() {
                 draw.delete_attached_surface(surf);
             }
-            if let Some((_size, surf)) = SURF_KB.take() {
+            if let Some((_size, surf)) = SURF_KB.try_write().unwrap().take() {
                 draw.delete_attached_surface(surf);
             }
         }
@@ -248,11 +248,12 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
 
-    if let Some((surf_size, _surf)) = SURF.as_ref() {
+    let mut surf = SURF.try_write().unwrap();
+    if let Some((surf_size, _surf)) = surf.as_ref() {
         if *surf_size != unit_area {
             println!("unit area resized");
-            real_draw.delete_attached_surface(SURF.take().unwrap().1);
-            SURF = Some((
+            real_draw.delete_attached_surface(surf.take().unwrap().1);
+            *surf = Some((
                 unit_area,
                 &mut *ddraw::create_surface(
                     *(addr(0xa7b20) as *mut *mut libc::c_void),
@@ -263,7 +264,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         }
     } else {
         println!("creating unit area surface");
-        SURF = Some((
+        *surf = Some((
             unit_area,
             &mut *ddraw::create_surface(
                 *(addr(0xa7b20) as *mut *mut libc::c_void),
@@ -273,7 +274,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         ));
     }
 
-    let mut draw = ddraw::IDirectDrawSurface::wrap(SURF.as_mut().unwrap().1);
+    let mut draw = ddraw::IDirectDrawSurface::wrap(surf.as_mut().unwrap().1);
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
 
@@ -701,7 +702,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     real_draw.blt_fast(
         (*dst_rect).left as u32,
         (*dst_rect).top as u32,
-        SURF.as_mut().unwrap().1,
+        surf.as_mut().unwrap().1,
         &raw mut src_rect,
         DDBLTFAST_SRCCOLORKEY,
     );
@@ -887,10 +888,11 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
 
     let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
 
-    if let Some((surf_size, _surf)) = SURF_KB.as_ref() {
+    let mut surf = SURF_KB.try_write().unwrap();
+    if let Some((surf_size, _surf)) = surf.as_ref() {
         if *surf_size != unit_area {
-            real_draw.delete_attached_surface(SURF_KB.take().unwrap().1);
-            SURF_KB = Some((
+            real_draw.delete_attached_surface(surf.take().unwrap().1);
+            *surf = Some((
                 unit_area,
                 &mut *ddraw::create_surface(
                     *(addr(0xa7b20) as *mut *mut libc::c_void),
@@ -900,7 +902,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
             ));
         }
     } else {
-        SURF_KB = Some((
+        *surf = Some((
             unit_area,
             &mut *ddraw::create_surface(
                 *(addr(0xa7b20) as *mut *mut libc::c_void),
@@ -910,7 +912,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         ));
     }
 
-    let mut draw = ddraw::IDirectDrawSurface::wrap(SURF_KB.as_mut().unwrap().1);
+    let mut draw = ddraw::IDirectDrawSurface::wrap(surf.as_mut().unwrap().1);
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
 
@@ -1392,7 +1394,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
 
     real_draw.blt(
         unit_area.as_lprect(),
-        SURF_KB.as_mut().unwrap().1,
+        surf.as_mut().unwrap().1,
         std::ptr::null_mut(),
         0x00010000 | 0x1000000,
         ddbltfx.as_mut_ptr().cast(),

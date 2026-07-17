@@ -1,5 +1,11 @@
 use std::{
-    ffi::CString, fs::File, mem::transmute, path::PathBuf, ptr, string::ToString, sync::LazyLock,
+    ffi::CString,
+    fs::File,
+    mem::transmute,
+    path::PathBuf,
+    ptr,
+    string::ToString,
+    sync::{LazyLock, OnceLock},
 };
 
 use regex::Regex;
@@ -29,7 +35,7 @@ use super::Feature;
 
 static M_DRAGDROP_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
-static mut VTABLE: Option<IDropTargetVtbl> = None;
+static VTABLE: OnceLock<IDropTargetVtbl> = OnceLock::new();
 
 pub struct DropHandlerData {
     drop_target: IDropTarget,
@@ -47,22 +53,25 @@ impl DragAndDrop {
             // the transmutes here are because the definitions in IDropTargetVtbl incorrectly
             //   use `*const POINTL` instead of `POINTL` which messes up pdw_effect
             // my functions correctly use POINTL so they need to be forced into place
-            VTABLE = Some(IDropTargetVtbl {
-                parent: IUnknownVtbl {
-                    QueryInterface: query_interface,
-                    AddRef: add_ref,
-                    Release: release,
-                },
-                DragEnter: transmute::<*const (), _>(drag_enter as *const ()),
-                DragOver: transmute::<*const (), _>(drag_over as *const ()),
-                DragLeave: drag_leave,
-                Drop: transmute::<*const (), _>(drop::<PTC> as *const ()),
-            });
+            VTABLE
+                .set(IDropTargetVtbl {
+                    parent: IUnknownVtbl {
+                        QueryInterface: query_interface,
+                        AddRef: add_ref,
+                        Release: release,
+                    },
+                    DragEnter: transmute::<*const (), _>(drag_enter as *const ()),
+                    DragOver: transmute::<*const (), _>(drag_over as *const ()),
+                    DragLeave: drag_leave,
+                    Drop: transmute::<*const (), _>(drop::<PTC> as *const ()),
+                })
+                .map_err(|_| ())
+                .unwrap();
         }
 
         let data = DropHandlerData {
             drop_target: IDropTarget {
-                lpVtbl: std::ptr::from_ref::<IDropTargetVtbl>(unsafe { VTABLE.as_ref() }.unwrap()),
+                lpVtbl: std::ptr::from_ref::<IDropTargetVtbl>(VTABLE.get().unwrap()),
             },
             state: DROPEFFECT_NONE,
         };
