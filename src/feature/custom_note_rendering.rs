@@ -121,17 +121,21 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, false);
                     }
+                    unsafe { winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0); }
                 } else if low == *M_NOTE_PULSE_ID {
                     unsafe {
                         NOTE_PULSE = winutil::menu_toggle(msg.hwnd, *M_NOTE_PULSE_ID);
+                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
                     }
                 } else if low == *M_VOLUME_FADE_ID {
                     unsafe {
                         VOLUME_FADE = winutil::menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
+                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
                     }
                 } else if low == *M_COLORED_UNITS_ID {
                     unsafe {
                         COLORED_UNITS = winutil::menu_toggle(msg.hwnd, *M_COLORED_UNITS_ID);
+                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
                     let scroll_hook_enabled =
@@ -143,6 +147,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         *M_NOTE_PULSE_ID,
                         scroll_hook_enabled && custom_rendering_enabled,
                     );
+                    unsafe { winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0); }
                 }
             }
         }
