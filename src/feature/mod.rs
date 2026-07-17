@@ -1,4 +1,5 @@
 pub mod custom_note_rendering;
+pub mod dialog_input_width;
 pub mod drag_and_drop;
 pub mod fps_display_fix;
 pub mod fps_unlock;

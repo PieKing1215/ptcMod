@@ -12,6 +12,7 @@ use windows::{
 };
 
 use crate::{
+    feature::dialog_input_width,
     ptc::{events::EventType, PTCVersion},
     winutil::{self, hiword, loword, Menus},
 };
@@ -82,6 +83,8 @@ unsafe extern "system" fn fill_dialog<PTC: PTCVersion>(
         SetDlgItemInt(hwnd, 0x449, (selection.clock_max / 10) as u32, true).unwrap();
         SetDlgItemInt(hwnd, 0x467, 0, true).unwrap();
         SetDlgItemInt(hwnd, 0x40a, PTC::get_beat_clock() / 10, true).unwrap();
+
+        dialog_input_width::modify_dialog(hwnd.0);
 
         PTC::center_window(hwnd);
     } else if msg == WM_COMMAND {

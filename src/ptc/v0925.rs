@@ -1,4 +1,4 @@
-use std::{ffi::CString, slice};
+use std::{ffi::CString, os::raw::c_void, slice};
 
 use windows::{
     core::PCSTR,
@@ -8,6 +8,7 @@ use windows::{
 use crate::{
     feature::{
         custom_note_rendering::{self, CustomNoteRendering},
+        dialog_input_width::{self, DialogInputWidth},
         drag_and_drop::DragAndDrop,
         fps_display_fix::FPSDisplayFix,
         fps_unlock::FPSUnlock,
@@ -16,7 +17,7 @@ use crate::{
         volume_muliply::VolumeAdjuster,
         Feature,
     },
-    patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
+    patch::{hook_post_ret_new, hook_post_ret_old, hook_pre_ret_new, replace, Patch},
     ptc::drawing::Rect,
 };
 
@@ -163,6 +164,18 @@ impl PTCVersion for PTC0925 {
         let f_fps_display_fix =
             FPSDisplayFix::new::<Self>(digit_patch, number_x_patch, label_x_patch);
 
+        // dialog input width
+
+        let dialog_input_setup_patch = hook_post_ret_old!(
+            0x192a1,
+            0x190b0,
+            "cdecl",
+            fn(h_dlg: *mut c_void),
+            dialog_input_width::modify_dialog
+        );
+
+        let f_dialog_input_width = DialogInputWidth::new::<Self>(dialog_input_setup_patch);
+
         vec![
             Box::new(FPSUnlock::new::<Self>()),
             Box::new(f_scroll_hook),
@@ -170,6 +183,7 @@ impl PTCVersion for PTC0925 {
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
             Box::new(f_fps_display_fix),
+            Box::new(f_dialog_input_width),
             Box::new(VolumeAdjuster::new()),
         ]
     }
