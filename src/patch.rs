@@ -1,5 +1,3 @@
-use winapi::um::{memoryapi::VirtualProtect, winnt::PAGE_EXECUTE_READWRITE};
-
 use crate::ptc::addr;
 
 #[derive(Clone)]
@@ -28,13 +26,14 @@ impl Patch {
             mem
         );
         if self.old == mem {
-            let mut lpfl_old_protect_1: winapi::shared::minwindef::DWORD = 0;
+            let mut lpfl_old_protect_1 = PAGE_PROTECTION_FLAGS::default();
             VirtualProtect(
                 addr(self.addr) as *mut libc::c_void,
                 mem.len(),
                 PAGE_EXECUTE_READWRITE,
                 &raw mut lpfl_old_protect_1,
-            );
+            )
+            .unwrap();
 
             mem.copy_from_slice(&self.new);
 
@@ -43,7 +42,8 @@ impl Patch {
                 mem.len(),
                 lpfl_old_protect_1,
                 &raw mut lpfl_old_protect_1,
-            );
+            )
+            .unwrap();
 
             log::debug!("-> {mem:x?}");
             Ok(())
@@ -67,13 +67,14 @@ impl Patch {
             mem
         );
         if self.new == mem {
-            let mut lpfl_old_protect: winapi::shared::minwindef::DWORD = 0;
+            let mut lpfl_old_protect = PAGE_PROTECTION_FLAGS::default();
             VirtualProtect(
                 addr(self.addr) as *mut libc::c_void,
                 mem.len(),
                 PAGE_EXECUTE_READWRITE,
                 &raw mut lpfl_old_protect,
-            );
+            )
+            .unwrap();
 
             mem.copy_from_slice(&self.old);
 
@@ -82,7 +83,8 @@ impl Patch {
                 mem.len(),
                 lpfl_old_protect,
                 &raw mut lpfl_old_protect,
-            );
+            )
+            .unwrap();
 
             log::debug!("-> {mem:x?}");
 
@@ -230,6 +232,9 @@ macro_rules! hook {
 }
 #[allow(unused_imports)]
 pub(crate) use hook;
+use windows::Win32::System::Memory::{
+    VirtualProtect, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
+};
 
 #[allow(clippy::all)]
 #[test]

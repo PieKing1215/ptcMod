@@ -1,5 +1,8 @@
 use widestring::U16CString;
-use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
+use windows::{
+    core::PCWSTR,
+    Win32::Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+};
 
 use crate::{
     feature::{
@@ -136,7 +139,7 @@ impl PTCVersion for PTC09454 {
         unsafe { &mut *(addr(0xbddd0) as *mut HWND) }
     }
 
-    fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {
+    fn get_hinstance() -> &'static mut HINSTANCE {
         unsafe { &mut *(addr(0xbddcc) as *mut HINSTANCE) }
     }
 
@@ -282,13 +285,13 @@ impl PTCVersion for PTC09454 {
     }
 
     fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize
+    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
     {
         unsafe extern "system" fn fill_about_dialog(
             hwnd: HWND,
             msg: u32,
-            w_param: usize,
-            l_param: isize,
+            w_param: WPARAM,
+            l_param: LPARAM,
         ) -> isize {
             crate::runtime::fill_about_dialog::<PTC09454>(hwnd, msg, w_param, l_param)
         }
@@ -434,9 +437,9 @@ impl PTCVersion for PTC09454 {
             // (clear_save_path)(addr(0xbe04c) as *mut _);
 
             log::debug!("set_window_title_path({cstr:?})");
-            let set_window_title_path: unsafe extern "cdecl" fn(path: winapi::um::winnt::LPCWSTR) =
+            let set_window_title_path: unsafe extern "cdecl" fn(path: PCWSTR) =
                 std::mem::transmute(addr(0x59650) as *const ());
-            (set_window_title_path)(cstr.as_ptr());
+            (set_window_title_path)(PCWSTR(cstr.as_ptr()));
 
             log::debug!("done.");
 

@@ -6,7 +6,7 @@ pub mod playhead;
 pub mod scroll_hook;
 pub mod volume_muliply;
 
-use winapi::um::winuser::MSG;
+use windows::Win32::UI::WindowsAndMessaging::MSG;
 
 use crate::{ptc::PTCVersion, winutil::Menus};
 

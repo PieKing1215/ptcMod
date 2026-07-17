@@ -2,9 +2,16 @@
 
 use std::{collections::HashMap, ffi::CString, sync::atomic::AtomicU16};
 
-use winapi::{
-    shared::windef::{HMENU, HWND},
-    um::winuser,
+use windows::{
+    core::PCSTR,
+    Win32::{
+        Foundation::HWND,
+        UI::WindowsAndMessaging::{
+            AppendMenuA, CheckMenuItem, CreateMenu, EnableMenuItem, GetMenu, GetMenuState,
+            RemoveMenu, HMENU, MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
+            MF_ENABLED, MF_GRAYED, MF_POPUP, MF_UNCHECKED,
+        },
+    },
 };
 
 use crate::ptc::PTCVersion;
@@ -30,15 +37,10 @@ impl Menus {
             .map
             .entry(display.to_string())
             .or_insert_with(|| unsafe {
-                let h_menu = winuser::GetMenu(*PTC::get_hwnd());
-                let menu = winuser::CreateMenu();
+                let h_menu = GetMenu(*PTC::get_hwnd());
+                let menu = CreateMenu().unwrap();
                 let l_title: Vec<u8> = format!("{display}\0").bytes().collect();
-                winuser::AppendMenuA(
-                    h_menu,
-                    winuser::MF_POPUP,
-                    menu as usize,
-                    l_title.as_ptr().cast::<i8>(),
-                );
+                AppendMenuA(h_menu, MF_POPUP, menu.0 as usize, PCSTR(l_title.as_ptr())).unwrap();
                 menu
             })
     }
@@ -50,17 +52,13 @@ impl Menus {
     pub fn cleanup<PTC: PTCVersion>(self) {
         for _ in self.map.keys() {
             unsafe {
-                winuser::RemoveMenu(
-                    winuser::GetMenu(*PTC::get_hwnd()),
-                    4,
-                    winuser::MF_BYPOSITION,
-                );
+                RemoveMenu(GetMenu(*PTC::get_hwnd()), 4, MF_BYPOSITION).unwrap();
             }
         }
     }
 }
 
-// utility type for accepting either a direct HMENU or taking an HWND and using winuser::GetMenu to get its HMENU
+// utility type for accepting either a direct HMENU or taking an HWND and using GetMenu to get its HMENU
 
 pub(crate) trait GetHMENU {
     fn get_hmenu(self) -> HMENU;
@@ -68,7 +66,7 @@ pub(crate) trait GetHMENU {
 
 impl GetHMENU for HWND {
     fn get_hmenu(self) -> HMENU {
-        unsafe { winuser::GetMenu(self) }
+        unsafe { GetMenu(self) }
     }
 }
 
@@ -83,45 +81,33 @@ impl GetHMENU for HMENU {
 pub(crate) fn get_menu_checked(menu: impl GetHMENU, id: impl Into<u32>) -> bool {
     let id = id.into();
     unsafe {
-        winuser::GetMenuState(menu.get_hmenu(), id, winuser::MF_BYCOMMAND) & winuser::MF_CHECKED > 0
+        MENU_ITEM_FLAGS(GetMenuState(menu.get_hmenu(), id, MF_BYCOMMAND)).contains(MF_CHECKED)
     }
 }
 
 pub(crate) fn set_menu_checked(menu: impl GetHMENU, id: impl Into<u32>, checked: bool) {
     let id = id.into();
     unsafe {
-        winuser::CheckMenuItem(
+        CheckMenuItem(
             menu.get_hmenu(),
             id,
-            winuser::MF_BYCOMMAND
-                | if checked {
-                    winuser::MF_CHECKED
-                } else {
-                    winuser::MF_UNCHECKED
-                },
+            (MF_BYCOMMAND | if checked { MF_CHECKED } else { MF_UNCHECKED }).0,
         );
     }
 }
 
 pub(crate) fn get_menu_enabled(menu: impl GetHMENU, id: impl Into<u32>) -> bool {
     let id = id.into();
-    unsafe {
-        winuser::GetMenuState(menu.get_hmenu(), id, winuser::MF_BYCOMMAND) & winuser::MF_GRAYED == 0
-    }
+    unsafe { MENU_ITEM_FLAGS(GetMenuState(menu.get_hmenu(), id, MF_BYCOMMAND)).contains(MF_GRAYED) }
 }
 
 pub(crate) fn set_menu_enabled(menu: impl GetHMENU, id: impl Into<u32>, enabled: bool) {
     let id = id.into();
     unsafe {
-        winuser::EnableMenuItem(
+        let _ = EnableMenuItem(
             menu.get_hmenu(),
             id,
-            winuser::MF_BYCOMMAND
-                | if enabled {
-                    winuser::MF_ENABLED
-                } else {
-                    winuser::MF_GRAYED
-                },
+            MF_BYCOMMAND | if enabled { MF_ENABLED } else { MF_GRAYED },
         );
     }
 }
@@ -146,7 +132,7 @@ pub(crate) fn add_menu_toggle(
     let id = id.into();
     let l_title = CString::new(name.into()).unwrap();
     unsafe {
-        winuser::AppendMenuA(menu, winuser::MF_CHECKED, id, l_title.as_ptr().cast::<i8>());
+        AppendMenuA(menu, MF_CHECKED, id, PCSTR(l_title.as_ptr().cast())).unwrap();
     }
 
     set_menu_checked(menu, id as u32, checked);
@@ -163,8 +149,24 @@ pub(crate) fn add_menu_button(
     let id = id.into();
     let l_title = CString::new(name.into()).unwrap();
     unsafe {
-        winuser::AppendMenuA(menu, 0, id, l_title.as_ptr().cast::<i8>());
+        AppendMenuA(
+            menu,
+            MENU_ITEM_FLAGS::default(),
+            id,
+            PCSTR(l_title.as_ptr().cast()),
+        )
+        .unwrap();
     }
 
     set_menu_enabled(menu, id as u32, enabled);
+}
+
+#[inline]
+pub fn loword(dw: u32) -> u16 {
+    (dw & 0xffff) as u16
+}
+
+#[inline]
+pub fn hiword(dw: u32) -> u16 {
+    ((dw >> 16) & 0xffff) as u16
 }

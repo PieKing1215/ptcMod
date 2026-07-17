@@ -5,9 +5,12 @@ pub mod v09454;
 
 use std::{path::PathBuf, sync::LazyLock};
 
-use winapi::{
-    shared::{minwindef::HINSTANCE, windef::HWND},
-    um::libloaderapi::GetModuleHandleA,
+use windows::{
+    core::PCSTR,
+    Win32::{
+        Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+        System::LibraryLoader::GetModuleHandleA,
+    },
 };
 
 use crate::{feature::Feature, ptc::drawing::Rect};
@@ -15,13 +18,11 @@ use crate::{feature::Feature, ptc::drawing::Rect};
 use self::events::{Event, EventList};
 
 static BASE_ADDR: LazyLock<usize> = LazyLock::new(|| unsafe {
-    GetModuleHandleA(
-        "ptCollage.exe\0"
-            .bytes()
-            .collect::<Vec<u8>>()
-            .as_ptr()
-            .cast::<i8>(),
-    ) as usize
+    GetModuleHandleA(PCSTR(
+        "ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr(),
+    ))
+    .unwrap()
+    .0 as usize
 });
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -72,7 +73,7 @@ pub trait PTCVersion {
     }
 
     fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize;
+    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize;
     fn center_window(hwnd: HWND);
     fn about_dlg_fn_2(hwnd: HWND);
     fn get_about_dialog_text_ids() -> (i32, i32, i32, i32);

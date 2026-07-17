@@ -1,12 +1,12 @@
 use std::sync::LazyLock;
 
-use winapi::um::winuser;
+use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_COMMAND};
 
 use crate::{
     feature::scroll_hook,
     patch::Patch,
     ptc::PTCVersion,
-    winutil::{self, Menus},
+    winutil::{self, hiword, loword, Menus},
 };
 
 use super::Feature;
@@ -44,10 +44,10 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
-        if msg.message == winuser::WM_COMMAND {
-            let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
+    fn win_msg(&mut self, msg: &MSG) {
+        if msg.message == WM_COMMAND {
+            let high = hiword(msg.wParam.0.try_into().unwrap());
+            let low = loword(msg.wParam.0.try_into().unwrap());
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {

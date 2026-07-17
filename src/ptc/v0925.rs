@@ -1,5 +1,10 @@
 use std::{ffi::CString, slice};
 
+use windows::{
+    core::PCSTR,
+    Win32::Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+};
+
 use crate::{
     feature::{
         custom_note_rendering::{self, CustomNoteRendering},
@@ -14,7 +19,6 @@ use crate::{
     patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
     ptc::drawing::Rect,
 };
-use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
 use super::{
     addr,
@@ -174,7 +178,7 @@ impl PTCVersion for PTC0925 {
         unsafe { &mut *(addr(0xDD4440 - 0xd30000) as *mut HWND) }
     }
 
-    fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {
+    fn get_hinstance() -> &'static mut HINSTANCE {
         unsafe { &mut *(addr(0x00dd431c - 0xd30000) as *mut HINSTANCE) }
     }
 
@@ -369,13 +373,13 @@ impl PTCVersion for PTC0925 {
     }
 
     fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize
+    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
     {
         unsafe extern "system" fn fill_about_dialog(
             hwnd: HWND,
             msg: u32,
-            w_param: usize,
-            l_param: isize,
+            w_param: WPARAM,
+            l_param: LPARAM,
         ) -> isize {
             crate::runtime::fill_about_dialog::<PTC0925>(hwnd, msg, w_param, l_param)
         }
@@ -496,9 +500,9 @@ impl PTCVersion for PTC0925 {
             (clear_save_path)(addr(0xa3598) as *mut _);
 
             log::debug!("set_window_title_path({cstr:?})");
-            let set_window_title_path: unsafe extern "cdecl" fn(path: winapi::um::winnt::LPCSTR) =
+            let set_window_title_path: unsafe extern "cdecl" fn(path: PCSTR) =
                 std::mem::transmute(addr(0x3ad0) as *const ());
-            (set_window_title_path)(cstr.as_ptr());
+            (set_window_title_path)(PCSTR(cstr.as_ptr().cast()));
 
             log::debug!("done.");
 

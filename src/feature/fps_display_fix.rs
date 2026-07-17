@@ -1,3 +1,5 @@
+use windows::Win32::UI::WindowsAndMessaging::MSG;
+
 use crate::{patch::Patch, ptc::PTCVersion, winutil::Menus};
 
 use super::Feature;
@@ -39,5 +41,5 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
         }
     }
 
-    fn win_msg(&mut self, _msg: &winapi::um::winuser::MSG) {}
+    fn win_msg(&mut self, _msg: &MSG) {}
 }

@@ -12,7 +12,8 @@ build = "src/build.rs"
 [dependencies]
 process-memory = "0.4"
 sysinfo = { version = "0.23", default-features = false }
-winapi = { version = "0.3", features = ["std", "handleapi", "libloaderapi", "memoryapi", "processthreadsapi", "winuser", "wincon", "synchapi", "winver", "ole2", "ddraw", "d2d1", "d3d9"] }
+windows = { version = "0.62", features = ["Win32_System_Console", "Win32_System_LibraryLoader", "Win32_Storage_FileSystem", "Win32_UI_WindowsAndMessaging", "Win32_System_SystemServices", "Win32_System_Threading", "Win32_Security", "Win32_System_Memory", "Win32_System_Diagnostics_Debug", "Win32_Graphics_DirectDraw", "Win32_Graphics_Gdi", "Win32_System_Ole", "Win32_System_Com", "Win32_System_Com_StructuredStorage"] }
+windows-core = "0.62"
 libc = { version = "0.2", features = ["use_std", "extra_traits"] }
 log = "0.4"
 simplelog = "0.12"

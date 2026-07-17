@@ -1,13 +1,19 @@
 use std::sync::LazyLock;
 
-use winapi::{
-    shared::windef::HWND,
-    um::winuser::{self, MSG},
+use windows::{
+    core::PCSTR,
+    Win32::{
+        Foundation::{HWND, LPARAM, WPARAM},
+        UI::WindowsAndMessaging::{
+            DialogBoxParamA, EndDialog, GetDlgItemInt, GetDlgItemTextA, SetDlgItemInt,
+            SetDlgItemTextA, MSG, WM_COMMAND, WM_INITDIALOG,
+        },
+    },
 };
 
 use crate::{
     ptc::{events::EventType, PTCVersion},
-    winutil::{self, Menus},
+    winutil::{self, hiword, loword, Menus},
 };
 
 use super::Feature;
@@ -31,21 +37,21 @@ impl<PTC: PTCVersion> Feature<PTC> for VolumeAdjuster {
     fn cleanup(&mut self) {}
 
     fn win_msg(&mut self, msg: &MSG) {
-        if msg.message == winuser::WM_COMMAND {
-            let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
+        if msg.message == WM_COMMAND {
+            let high = hiword(msg.wParam.0.try_into().unwrap());
+            let low = loword(msg.wParam.0.try_into().unwrap());
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {
                 if low == *M_VOLUME_MULTIPLY_ID {
                     unsafe {
                         let l_template: Vec<u8> = "DLG_EVENTVOLUME\0".bytes().collect();
-                        winuser::DialogBoxParamA(
-                            *PTC::get_hinstance(),
-                            l_template.as_ptr().cast::<i8>(),
-                            msg.hwnd,
+                        DialogBoxParamA(
+                            Some(*PTC::get_hinstance()),
+                            PCSTR(l_template.as_ptr()),
+                            Some(msg.hwnd),
                             Some(fill_dialog::<PTC>),
-                            0,
+                            LPARAM(0),
                         );
                     }
                 }
@@ -57,49 +63,44 @@ impl<PTC: PTCVersion> Feature<PTC> for VolumeAdjuster {
 unsafe extern "system" fn fill_dialog<PTC: PTCVersion>(
     hwnd: HWND,
     msg: u32,
-    w_param: usize,
-    _l_param: isize,
+    w_param: WPARAM,
+    _l_param: LPARAM,
 ) -> isize {
-    if msg == winuser::WM_INITDIALOG {
+    if msg == WM_INITDIALOG {
         let title: Vec<u8> = "== Volume Multiply ==\0".bytes().collect();
-        winuser::SetDlgItemTextA(hwnd, 0x451, title.as_ptr().cast::<i8>());
+        SetDlgItemTextA(hwnd, 0x451, PCSTR(title.as_ptr())).unwrap();
 
         PTC::volume_adjust_fill_selected_units(hwnd);
 
         let selection = PTC::get_selected_range();
 
-        winuser::SetDlgItemInt(hwnd, 0x403, selection.meas_min as u32, 1);
-        winuser::SetDlgItemInt(hwnd, 0x404, selection.meas_max as u32, 1);
-        winuser::SetDlgItemInt(hwnd, 0x446, selection.beat_min as u32, 1);
-        winuser::SetDlgItemInt(hwnd, 0x448, selection.beat_max as u32, 1);
-        winuser::SetDlgItemInt(hwnd, 0x447, (selection.clock_min / 10) as u32, 1);
-        winuser::SetDlgItemInt(hwnd, 0x449, (selection.clock_max / 10) as u32, 1);
-        winuser::SetDlgItemInt(hwnd, 0x467, 0, 1);
-        winuser::SetDlgItemInt(hwnd, 0x40a, PTC::get_beat_clock() / 10, 1);
+        SetDlgItemInt(hwnd, 0x403, selection.meas_min as u32, true).unwrap();
+        SetDlgItemInt(hwnd, 0x404, selection.meas_max as u32, true).unwrap();
+        SetDlgItemInt(hwnd, 0x446, selection.beat_min as u32, true).unwrap();
+        SetDlgItemInt(hwnd, 0x448, selection.beat_max as u32, true).unwrap();
+        SetDlgItemInt(hwnd, 0x447, (selection.clock_min / 10) as u32, true).unwrap();
+        SetDlgItemInt(hwnd, 0x449, (selection.clock_max / 10) as u32, true).unwrap();
+        SetDlgItemInt(hwnd, 0x467, 0, true).unwrap();
+        SetDlgItemInt(hwnd, 0x40a, PTC::get_beat_clock() / 10, true).unwrap();
 
         PTC::center_window(hwnd);
-    } else if msg == winuser::WM_COMMAND {
-        let high = winapi::shared::minwindef::HIWORD(w_param.try_into().unwrap());
-        let low = winapi::shared::minwindef::LOWORD(w_param.try_into().unwrap());
+    } else if msg == WM_COMMAND {
+        let high = hiword(w_param.0.try_into().unwrap());
+        let low = loword(w_param.0.try_into().unwrap());
 
         if high == 0 {
             if low == 1 {
                 // click "OK"
 
-                let meas_min = winuser::GetDlgItemInt(hwnd, 0x403, std::ptr::null_mut(), 1) as i32;
-                let meas_max = winuser::GetDlgItemInt(hwnd, 0x404, std::ptr::null_mut(), 1) as i32;
-                let beat_min = winuser::GetDlgItemInt(hwnd, 0x446, std::ptr::null_mut(), 1) as i32;
-                let beat_max = winuser::GetDlgItemInt(hwnd, 0x448, std::ptr::null_mut(), 1) as i32;
-                let clock_min = winuser::GetDlgItemInt(hwnd, 0x447, std::ptr::null_mut(), 1) as i32;
-                let clock_max = winuser::GetDlgItemInt(hwnd, 0x449, std::ptr::null_mut(), 1) as i32;
+                let meas_min = GetDlgItemInt(hwnd, 0x403, None, true) as i32;
+                let meas_max = GetDlgItemInt(hwnd, 0x404, None, true) as i32;
+                let beat_min = GetDlgItemInt(hwnd, 0x446, None, true) as i32;
+                let beat_max = GetDlgItemInt(hwnd, 0x448, None, true) as i32;
+                let clock_min = GetDlgItemInt(hwnd, 0x447, None, true) as i32;
+                let clock_max = GetDlgItemInt(hwnd, 0x449, None, true) as i32;
 
                 let mut buf = [0_u8; 16];
-                let len = winuser::GetDlgItemTextA(
-                    hwnd,
-                    0x469,
-                    buf.as_mut_ptr().cast::<i8>(),
-                    buf.len() as libc::c_int,
-                );
+                let len = GetDlgItemTextA(hwnd, 0x469, &mut buf);
                 let factor = std::str::from_utf8(&buf[..len as usize])
                     .map_or(1.0, |s| s.parse::<f32>().unwrap_or(1.0));
 
@@ -127,10 +128,10 @@ unsafe extern "system" fn fill_dialog<PTC: PTCVersion>(
                     cur = (*cur).next;
                 }
 
-                winuser::EndDialog(hwnd, 1);
+                EndDialog(hwnd, 1).unwrap();
             } else {
                 // esc or cancel
-                winuser::EndDialog(hwnd, 0);
+                EndDialog(hwnd, 0).unwrap();
             }
         }
     }

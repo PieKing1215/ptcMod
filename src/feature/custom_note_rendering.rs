@@ -1,24 +1,25 @@
 use std::sync::{LazyLock, RwLock};
 
 use colorsys::ColorTransform;
-use winapi::{
-    shared::windef::{LPRECT, RECT},
-    um::winuser::{self},
+use windows::Win32::{
+    Foundation::RECT,
+    Graphics::{
+        DirectDraw::{IDirectDrawSurface, DDBLTFAST_SRCCOLORKEY},
+        Gdi::InvalidateRect,
+    },
+    UI::WindowsAndMessaging::{MSG, WM_COMMAND},
 };
+use windows_core::Interface;
 
 use crate::{
     patch::Patch,
     ptc::{
         addr,
-        drawing::{
-            color::Color,
-            ddraw::{self, DDBLTFAST_SRCCOLORKEY},
-            Draw, Rect,
-        },
+        drawing::{color::Color, ddraw, Draw, Rect},
         events::{Event, EventType},
         PTCVersion,
     },
-    winutil::{self, Menus},
+    winutil::{self, hiword, loword, Menus},
 };
 
 use super::{scroll_hook, Feature};
@@ -34,8 +35,13 @@ static mut VOLUME_FADE: bool = true;
 static mut COLORED_UNITS: bool = true;
 
 // static mut DCRT: Option<&'static mut ID2D1DCRenderTarget> = None;
-static SURF: RwLock<Option<(Rect<i32>, &'static mut libc::c_void)>> = RwLock::new(None);
-static SURF_KB: RwLock<Option<(Rect<i32>, &'static mut libc::c_void)>> = RwLock::new(None);
+static SURF: RwLock<Option<(Rect<i32>, ForceSendSync<IDirectDrawSurface>)>> = RwLock::new(None);
+static SURF_KB: RwLock<Option<(Rect<i32>, ForceSendSync<IDirectDrawSurface>)>> = RwLock::new(None);
+
+struct ForceSendSync<T>(T);
+
+unsafe impl<T> Send for ForceSendSync<T> {}
+unsafe impl<T> Sync for ForceSendSync<T> {}
 
 pub struct CustomNoteRendering {
     draw_unit_notes_patch: Patch,
@@ -82,20 +88,22 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 log::warn!("draw_kb_notes_patch: {e:?}");
             }
 
-            let draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
-            if let Some((_size, surf)) = SURF.try_write().unwrap().take() {
-                draw.delete_attached_surface(surf);
+            let draw =
+                IDirectDrawSurface::from_raw_borrowed(&*(addr(0xa7b28) as *mut *mut libc::c_void))
+                    .unwrap();
+            if let Some((_size, ForceSendSync(surf))) = SURF.try_write().unwrap().take() {
+                let _ = draw.DeleteAttachedSurface(0, &surf);
             }
-            if let Some((_size, surf)) = SURF_KB.try_write().unwrap().take() {
-                draw.delete_attached_surface(surf);
+            if let Some((_size, ForceSendSync(surf))) = SURF_KB.try_write().unwrap().take() {
+                let _ = draw.DeleteAttachedSurface(0, &surf);
             }
         }
     }
 
-    fn win_msg(&mut self, msg: &winuser::MSG) {
-        if msg.message == winuser::WM_COMMAND {
-            let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
+    fn win_msg(&mut self, msg: &MSG) {
+        if msg.message == WM_COMMAND {
+            let high = hiword(msg.wParam.0.try_into().unwrap());
+            let low = loword(msg.wParam.0.try_into().unwrap());
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {
@@ -121,21 +129,23 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, false);
                     }
-                    unsafe { winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0); }
+                    unsafe {
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
+                    }
                 } else if low == *M_NOTE_PULSE_ID {
                     unsafe {
                         NOTE_PULSE = winutil::menu_toggle(msg.hwnd, *M_NOTE_PULSE_ID);
-                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
                     }
                 } else if low == *M_VOLUME_FADE_ID {
                     unsafe {
                         VOLUME_FADE = winutil::menu_toggle(msg.hwnd, *M_VOLUME_FADE_ID);
-                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
                     }
                 } else if low == *M_COLORED_UNITS_ID {
                     unsafe {
                         COLORED_UNITS = winutil::menu_toggle(msg.hwnd, *M_COLORED_UNITS_ID);
-                        winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
                     let scroll_hook_enabled =
@@ -147,7 +157,9 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         *M_NOTE_PULSE_ID,
                         scroll_hook_enabled && custom_rendering_enabled,
                     );
-                    unsafe { winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0); }
+                    unsafe {
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
+                    }
                 }
             }
         }
@@ -251,35 +263,36 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
     let unit_height = 16;
 
-    let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
+    let real_draw =
+        IDirectDrawSurface::from_raw_borrowed(&*(addr(0xa7b28) as *mut *mut libc::c_void)).unwrap();
 
     let mut surf = SURF.try_write().unwrap();
     if let Some((surf_size, _surf)) = surf.as_ref() {
         if *surf_size != unit_area {
             println!("unit area resized");
-            real_draw.delete_attached_surface(surf.take().unwrap().1);
+            let _ = real_draw.DeleteAttachedSurface(0, &surf.take().unwrap().1 .0);
             *surf = Some((
                 unit_area,
-                &mut *ddraw::create_surface(
+                ForceSendSync(ddraw::create_surface(
                     *(addr(0xa7b20) as *mut *mut libc::c_void),
                     unit_area.width(),
                     unit_area.height(),
-                ),
+                )),
             ));
         }
     } else {
         println!("creating unit area surface");
         *surf = Some((
             unit_area,
-            &mut *ddraw::create_surface(
+            ForceSendSync(ddraw::create_surface(
                 *(addr(0xa7b20) as *mut *mut libc::c_void),
                 unit_area.width(),
                 unit_area.height(),
-            ),
+            )),
         ));
     }
 
-    let mut draw = ddraw::IDirectDrawSurface::wrap(surf.as_mut().unwrap().1);
+    let draw = &surf.as_mut().unwrap().1 .0;
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
 
@@ -696,21 +709,23 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     // );
 
     let mut unit_rect = PTC::get_unit_rect();
-    let dst_rect: LPRECT = unit_rect.as_lprect();
-    let mut src_rect: RECT = RECT {
+    let dst_rect = unit_rect.as_lprect();
+    let mut src_rect = RECT {
         left: 0,
         top: 0,
         right: bounds.width(),
         bottom: bounds.height(),
     };
 
-    real_draw.blt_fast(
-        (*dst_rect).left as u32,
-        (*dst_rect).top as u32,
-        surf.as_mut().unwrap().1,
-        &raw mut src_rect,
-        DDBLTFAST_SRCCOLORKEY,
-    );
+    real_draw
+        .BltFast(
+            (*dst_rect).left as u32,
+            (*dst_rect).top as u32,
+            &surf.as_mut().unwrap().1 .0,
+            &raw mut src_rect,
+            DDBLTFAST_SRCCOLORKEY,
+        )
+        .unwrap();
 }
 
 /// Old function to override drawing individual notes
@@ -891,33 +906,34 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
 
     let unit_height = 16;
 
-    let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
+    let real_draw =
+        IDirectDrawSurface::from_raw_borrowed(&*(addr(0xa7b28) as *mut *mut libc::c_void)).unwrap();
 
     let mut surf = SURF_KB.try_write().unwrap();
     if let Some((surf_size, _surf)) = surf.as_ref() {
         if *surf_size != unit_area {
-            real_draw.delete_attached_surface(surf.take().unwrap().1);
+            let _ = real_draw.DeleteAttachedSurface(0, &surf.take().unwrap().1 .0);
             *surf = Some((
                 unit_area,
-                &mut *ddraw::create_surface(
+                ForceSendSync(ddraw::create_surface(
                     *(addr(0xa7b20) as *mut *mut libc::c_void),
                     unit_area.width(),
                     unit_area.height(),
-                ),
+                )),
             ));
         }
     } else {
         *surf = Some((
             unit_area,
-            &mut *ddraw::create_surface(
+            ForceSendSync(ddraw::create_surface(
                 *(addr(0xa7b20) as *mut *mut libc::c_void),
                 unit_area.width(),
                 unit_area.height(),
-            ),
+            )),
         ));
     }
 
-    let mut draw = ddraw::IDirectDrawSurface::wrap(surf.as_mut().unwrap().1);
+    let draw = &surf.as_mut().unwrap().1 .0;
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
 
@@ -1397,11 +1413,13 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     ddbltfx[23] = 0;
     ddbltfx[24] = 0;
 
-    real_draw.blt(
-        unit_area.as_lprect(),
-        surf.as_mut().unwrap().1,
-        std::ptr::null_mut(),
-        0x00010000 | 0x1000000,
-        ddbltfx.as_mut_ptr().cast(),
-    );
+    real_draw
+        .Blt(
+            unit_area.as_lprect(),
+            &surf.as_mut().unwrap().1 .0,
+            std::ptr::null_mut(),
+            0x00010000 | 0x1000000,
+            ddbltfx.as_mut_ptr().cast(),
+        )
+        .unwrap();
 }

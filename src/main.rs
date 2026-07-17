@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use path_absolutize::Absolutize;
 use process_memory::{Pid, ProcessHandle, TryIntoProcessHandle};
 use sysinfo::{PidExt, ProcessExt, System, SystemExt};
+use windows::Win32::Foundation::HANDLE;
 
 mod inject;
 
@@ -40,7 +41,7 @@ fn main() {
                     .map_or(path.clone(), |abs| abs.to_path_buf());
                 println!("Attempting to inject ptc_mod.dll @ {:?}", path);
 
-                let res = inject::inject_dll(handle.0, path.as_path());
+                let res = inject::inject_dll(HANDLE(handle.0), path.as_path());
 
                 if let Err(e) = res {
                     eprintln!("{:?}", e);
