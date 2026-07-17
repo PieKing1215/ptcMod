@@ -5,6 +5,15 @@ use winapi::shared::{
 
 use super::{color::Color, Draw, Rect};
 
+#[allow(unused)]
+pub const DDBLTFAST_NOCOLORKEY: u32 = 0x00000000;
+#[allow(unused)]
+pub const DDBLTFAST_SRCCOLORKEY: u32 = 0x00000001;
+#[allow(unused)]
+pub const DDBLTFAST_DESTCOLORKEY: u32 = 0x00000002;
+#[allow(unused)]
+pub const DDBLTFAST_WAIT: u32 = 0x00000010;
+
 pub struct IDirectDrawSurface {
     raw: *mut libc::c_void,
     fn_blt: unsafe extern "stdcall" fn(
@@ -106,7 +115,7 @@ impl IDirectDrawSurface {
             std::mem::transmute(*((*(self.raw as *mut usize) + 0x44) as *const *const ()));
 
         let mut hdc: HDC = std::ptr::null_mut();
-        (raw_fn)(self.raw, &mut hdc);
+        (raw_fn)(self.raw, &raw mut hdc);
         hdc
     }
 
@@ -139,8 +148,9 @@ impl Draw for IDirectDrawSurface {
         let mut ddbltfx = [0_u32; 25];
         ddbltfx[0] = 100;
         ddbltfx[20] = color.into_argb();
+        let mut rect = *rect;
         self.blt(
-            rect as *const _ as *mut _,
+            rect.as_lprect(),
             std::ptr::null_mut(),
             std::ptr::null_mut(),
             0x1000400,
@@ -193,7 +203,7 @@ pub unsafe fn create_surface(
     (raw_fn)(
         ddraw,
         surface_desc.as_mut_ptr().cast(),
-        &mut out_surf,
+        &raw mut out_surf,
         std::ptr::null_mut(),
     );
     out_surf

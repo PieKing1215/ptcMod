@@ -1,4 +1,4 @@
-use std::{convert::TryInto, mem::MaybeUninit, sync::mpsc::Sender};
+use std::{convert::TryInto, mem::MaybeUninit, sync::{LazyLock, mpsc::Sender}};
 
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
@@ -20,10 +20,8 @@ use crate::{
     winutil::{self, Menus},
 };
 
-lazy_static::lazy_static! {
-    static ref M_ABOUT_ID: u16 = winutil::next_id();
-    static ref M_UNINJECT_ID: u16 = winutil::next_id();
-}
+static M_ABOUT_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_UNINJECT_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 enum MsgType {
     Uninject,
@@ -69,7 +67,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
         };
         log::info!("PTC Mod starting...");
         log::info!("mod version = {}", VERSION.unwrap_or("unknown"));
-        log::info!("PID = {}", pid);
+        log::info!("PID = {pid}");
 
         unsafe {
             let hwnd = PTC::get_hwnd();
@@ -82,10 +80,10 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                     .cast::<i8>(),
             ) as usize;
 
-            log::debug!("Base address (allocation address) = {}", base);
+            log::debug!("Base address (allocation address) = {base}");
 
             let (v1, v2, v3, v4) = PTC::get_version();
-            log::info!("ptc version = {}.{}.{}.{}", v1, v2, v3, v4);
+            log::info!("ptc version = {v1}.{v2}.{v3}.{v4}");
 
             let msg = format!(
                 "Injected!\nPID = {}\nptc version = {}.{}.{}.{}\nmod version = {}\0",

@@ -8,7 +8,7 @@ use crate::{
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{hook, hook_pre_ret_new, Patch},
+    patch::{Patch, hook, hook_pre_ret_new}, ptc::drawing::Rect,
 };
 
 use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion, Selection};
@@ -228,19 +228,19 @@ impl PTCVersion for PTC09454 {
         .max(0)
     }
 
-    fn get_unit_rect() -> [i32; 4] {
+    fn get_unit_rect() -> Rect<i32> {
         // this version's rectangles are floats while 0.9.2.5 is ints
         unsafe {
-            [
+            Rect::new(
                 *(addr(0xbfe48) as *const f32) as i32,
                 *(addr(0xbfe48 + 0x04) as *const f32) as i32,
                 *(addr(0xbfe48 + 0x08) as *const f32) as i32,
                 *(addr(0xbfe48 + 0x0c) as *const f32) as i32,
-            ]
+            )
         }
     }
 
-    fn get_kb_rect() -> [i32; 4] {
+    fn get_kb_rect() -> Rect<i32> {
         todo!()
     }
 
@@ -355,6 +355,7 @@ impl PTCVersion for PTC09454 {
     }
 
     fn load_file_no_history(path: std::path::PathBuf) {
+        #[expect(clippy::unnecessary_debug_formatting, reason = "false positive")]
         unsafe {
             log::debug!("load_file_no_history({path:?})");
 

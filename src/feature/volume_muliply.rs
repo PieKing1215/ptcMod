@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use winapi::{
     shared::windef::HWND,
     um::winuser::{self, MSG},
@@ -10,9 +12,7 @@ use crate::{
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_VOLUME_MULTIPLY_ID: u16 = winutil::next_id();
-}
+static M_VOLUME_MULTIPLY_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub struct VolumeAdjuster {}
 

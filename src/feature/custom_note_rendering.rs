@@ -1,25 +1,22 @@
+use std::sync::LazyLock;
+
 use colorsys::ColorTransform;
 use winapi::{shared::windef::{LPRECT, RECT}, um::winuser::{self}};
 
 use crate::{
     patch::Patch,
     ptc::{
-        addr,
-        drawing::{color::Color, ddraw, Draw, Rect},
-        events::{Event, EventType},
-        PTCVersion,
+        PTCVersion, addr, drawing::{Draw, Rect, color::Color, ddraw::{self, DDBLTFAST_SRCCOLORKEY}}, events::{Event, EventType}
     },
     winutil::{self, Menus},
 };
 
 use super::{scroll_hook, Feature};
 
-lazy_static::lazy_static! {
-    static ref M_CUSTOM_RENDERING_ENABLED_ID: u16 = winutil::next_id();
-    static ref M_NOTE_PULSE_ID: u16 = winutil::next_id();
-    static ref M_VOLUME_FADE_ID: u16 = winutil::next_id();
-    static ref M_COLORED_UNITS_ID: u16 = winutil::next_id();
-}
+static M_CUSTOM_RENDERING_ENABLED_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_NOTE_PULSE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_VOLUME_FADE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_COLORED_UNITS_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 // store our own values instead since calling winapi in the draw loop would be slow
 static mut NOTE_PULSE: bool = true;
@@ -71,11 +68,11 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
     fn cleanup(&mut self) {
         unsafe {
             if let Err(e) = self.draw_unit_notes_patch.unapply() {
-                log::warn!("draw_unit_notes_patch: {:?}", e);
+                log::warn!("draw_unit_notes_patch: {e:?}");
             }
 
             if let Err(e) = self.draw_kb_notes_patch.unapply() {
-                log::warn!("draw_kb_notes_patch: {:?}", e);
+                log::warn!("draw_kb_notes_patch: {e:?}");
             }
 
             let draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
@@ -230,7 +227,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     let ofs_x = PTC::get_unit_scroll_ofs_x();
     let ofs_y = PTC::get_unit_scroll_ofs_y();
 
-    let unit_area = &*PTC::get_unit_rect().as_ptr().cast::<Rect<i32>>();
+    let unit_area = PTC::get_unit_rect();
     let bounds = Rect::<i32>::new(0, 0, unit_area.width(), unit_area.height());
 
     if bounds.width() <= 0 || bounds.height() <= 0 {
@@ -245,11 +242,11 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
 
     if let Some((surf_size, _surf)) = SURF.as_ref() {
-        if surf_size != unit_area {
+        if *surf_size != unit_area {
             println!("unit area resized");
             real_draw.delete_attached_surface(SURF.take().unwrap().1);
             SURF = Some((
-                *unit_area,
+                unit_area,
                 &mut *ddraw::create_surface(
                     *(addr(0xa7b20) as *mut *mut libc::c_void),
                     unit_area.width(),
@@ -260,7 +257,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     } else {
         println!("creating unit area surface");
         SURF = Some((
-            *unit_area,
+            unit_area,
             &mut *ddraw::create_surface(
                 *(addr(0xa7b20) as *mut *mut libc::c_void),
                 unit_area.width(),
@@ -312,7 +309,9 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                 cur_velocity[u as usize] = eve.value;
             }
             EventType::On => {
+                #[allow(clippy::bool_to_int_with_if)]
                 let mut color = colors[if dim { 1 } else { 0 }];
+                #[allow(clippy::bool_to_int_with_if)]
                 let mut highlight_color = colors[if dim { 1 } else { 0 }];
 
                 if COLORED_UNITS {
@@ -344,7 +343,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                             // right of note is to the right of the playhead (playhead is on the note)
 
                             if NOTE_PULSE {
-                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS
                                     - unit_area.left)
                                     * beat_clock as i32
                                     / *meas_width as i32;
@@ -381,7 +380,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                             }
 
                             if VOLUME_FADE {
-                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS
                                     - unit_area.left)
                                     * beat_clock as i32
                                     / *meas_width as i32;
@@ -642,11 +641,11 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     }
                 }
             }
-            EventType::Velocity | EventType::Key => {}
             _ => {
                 let x =
                     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
                 if x > bounds.left - 2 {
+                    #[allow(clippy::bool_to_int_with_if)]
                     let color = Color::from_argb([0xff00f080, 0x007840][if dim { 1 } else { 0 }]);
                     if do_batching {
                         batch_a.push((Rect::<i32>::new(x, y + 4, x + 2, y + 6), color));
@@ -679,18 +678,14 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     //     ddbltfx.as_mut_ptr().cast(),
     // );
 
-    let dst_rect: LPRECT = PTC::get_unit_rect().as_mut_ptr().cast();
+    let mut unit_rect = PTC::get_unit_rect();
+    let dst_rect: LPRECT = unit_rect.as_lprect();
     let mut src_rect: RECT = RECT {
         left: 0,
         top: 0,
         right: bounds.width(),
         bottom: bounds.height(),
     };
-
-    const DDBLTFAST_NOCOLORKEY: u32 = 0x00000000;
-    const DDBLTFAST_SRCCOLORKEY: u32 = 0x00000001;
-    const DDBLTFAST_DESTCOLORKEY: u32 = 0x00000002;
-    const DDBLTFAST_WAIT: u32 = 0x00000010;
 
     real_draw.blt_fast(
         (*dst_rect).left as u32,
@@ -701,9 +696,11 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     );
 }
 
+/// Old function to override drawing individual notes
 // the second parameter here would normally be color, but an asm patch is used to change it to push the ebp register instead
 //      which can be used to get the unit and focus state (which could be used to get the original color anyway)
 #[allow(clippy::too_many_lines)] // TODO
+#[allow(unused)]
 pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     rect: *const libc::c_int,
     unit: u32,
@@ -711,6 +708,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
 ) {
     // color = 0x0094FF;
 
+    #[allow(clippy::bool_to_int_with_if)]
     let color = PTC::get_base_note_colors_argb()[if not_focused { 1 } else { 0 }];
     let raw_argb = color.to_be_bytes();
     let mut rgb = colorsys::Rgb::from([raw_argb[1], raw_argb[2], raw_argb[3]]);
@@ -731,7 +729,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 // right of note is to the right of the playhead (playhead is on the note)
 
                 if NOTE_PULSE {
-                    let mix = flash_strength as f64;
+                    let mix = flash_strength;
                     rgb.set_red(rgb.red() + (255.0 - rgb.red()) * mix);
                     rgb.set_green(rgb.green() + (255.0 - rgb.green()) * mix);
                     rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
@@ -774,7 +772,7 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
                 if NOTE_PULSE && rect[2] >= fade_pt {
                     let thru = (rect[2] - fade_pt) as f32 / fade_size as f32;
 
-                    let mix = thru as f64 * flash_strength as f64;
+                    let mix = thru as f64 * flash_strength;
                     rgb.set_red(rgb.red() + (255.0 - rgb.red()) * mix);
                     rgb.set_green(rgb.green() + (255.0 - rgb.green()) * mix);
                     rgb.set_blue(rgb.blue() + (255.0 - rgb.blue()) * mix);
@@ -835,13 +833,13 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     // main
     PTC::draw_rect([rect[0], rect[1], rect[2], rect[3]], color);
 
-    if rect[0] > PTC::get_unit_rect()[0] {
+    if rect[0] > PTC::get_unit_rect().left {
         // left edge
         PTC::draw_rect([rect[0] - 1, rect[1] - 1, rect[0], rect[3] + 1], color);
         PTC::draw_rect([rect[0] - 2, rect[1] - 3, rect[0] - 1, rect[3] + 3], color);
     }
 
-    if rect[2] > PTC::get_unit_rect()[0] {
+    if rect[2] > PTC::get_unit_rect().left {
         // right edge
         PTC::draw_rect([rect[2], rect[1], rect[2] + 1, rect[3]], color);
         PTC::draw_rect([rect[2] + 1, rect[1] + 1, rect[2] + 2, rect[3] - 1], color);
@@ -865,7 +863,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     let ofs_x = PTC::get_kb_scroll_ofs_x();
     let ofs_y = PTC::get_kb_scroll_ofs_y();
 
-    let unit_area = &*PTC::get_kb_rect().as_ptr().cast::<Rect<i32>>();
+    let mut unit_area = PTC::get_kb_rect();
     let bounds = Rect::<i32>::new(0, 0, unit_area.width(), unit_area.height());
 
     if bounds.width() <= 0 || bounds.height() <= 0 {
@@ -880,10 +878,10 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     let real_draw = ddraw::IDirectDrawSurface::wrap(*(addr(0xa7b28) as *mut *mut libc::c_void));
 
     if let Some((surf_size, _surf)) = SURF_KB.as_ref() {
-        if surf_size != unit_area {
+        if *surf_size != unit_area {
             real_draw.delete_attached_surface(SURF_KB.take().unwrap().1);
             SURF_KB = Some((
-                *unit_area,
+                unit_area,
                 &mut *ddraw::create_surface(
                     *(addr(0xa7b20) as *mut *mut libc::c_void),
                     unit_area.width(),
@@ -893,7 +891,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         }
     } else {
         SURF_KB = Some((
-            *unit_area,
+            unit_area,
             &mut *ddraw::create_surface(
                 *(addr(0xa7b20) as *mut *mut libc::c_void),
                 unit_area.width(),
@@ -956,7 +954,9 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 cur_velocity[u as usize] = eve.value;
             }
             EventType::On => {
+                #[allow(clippy::bool_to_int_with_if)]
                 let mut color = colors[if dim { 1 } else { 0 }];
+                #[allow(clippy::bool_to_int_with_if)]
                 let mut highlight_color = colors[if dim { 1 } else { 0 }];
 
                 if COLORED_UNITS {
@@ -988,7 +988,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                             // right of note is to the right of the playhead (playhead is on the note)
 
                             if NOTE_PULSE {
-                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS
                                     - unit_area.left)
                                     * beat_clock as i32
                                     / *meas_width as i32;
@@ -1027,7 +1027,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                             }
 
                             if VOLUME_FADE {
-                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS as i32
+                                let clock = (ofs_x + scroll_hook::LAST_PLAYHEAD_POS
                                     - unit_area.left)
                                     * beat_clock as i32
                                     / *meas_width as i32;
@@ -1339,7 +1339,6 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 //     }
                 // }
             }
-            EventType::Velocity | EventType::Key => {}
             _ => {
                 // let x =
                 //     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
@@ -1368,7 +1367,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     ddbltfx[24] = 0;
 
     real_draw.blt(
-        PTC::get_kb_rect().as_mut_ptr().cast(),
+        unit_area.as_lprect(),
         SURF_KB.as_mut().unwrap().1,
         std::ptr::null_mut(),
         0x00010000 | 0x1000000,

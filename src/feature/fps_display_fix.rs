@@ -23,7 +23,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.apply() {
-                    log::warn!("fps display patch: {:?}", e);
+                    log::warn!("fps display patch: {e:?}");
                 }
             }
         }
@@ -33,7 +33,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("fps display patch: {:?}", e);
+                    log::warn!("fps display patch: {e:?}");
                 }
             }
         }

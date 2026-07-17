@@ -3,26 +3,24 @@ pub mod events;
 pub mod v0925;
 pub mod v09454;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::LazyLock};
 
 use winapi::{
     shared::{minwindef::HINSTANCE, windef::HWND},
     um::libloaderapi::GetModuleHandleA,
 };
 
-use crate::feature::Feature;
+use crate::{feature::Feature, ptc::drawing::Rect};
 
 use self::events::{Event, EventList};
 
-lazy_static::lazy_static! {
-    static ref BASE_ADDR: usize = unsafe { GetModuleHandleA(
+static BASE_ADDR: LazyLock<usize> = LazyLock::new(|| unsafe { GetModuleHandleA(
         "ptCollage.exe\0"
             .bytes()
             .collect::<Vec<u8>>()
             .as_ptr()
             .cast::<i8>(),
-    ) as usize };
-}
+    ) as usize });
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Selection {
@@ -34,6 +32,7 @@ pub struct Selection {
     pub clock_max: i32,
 }
 
+#[allow(unused)]
 pub trait PTCVersion {
     fn get_features() -> Vec<Box<dyn Feature<Self>>>;
     fn get_hwnd() -> &'static mut HWND;
@@ -52,8 +51,8 @@ pub trait PTCVersion {
     fn get_play_pos() -> &'static mut u32;
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
-    fn get_unit_rect() -> [i32; 4];
-    fn get_kb_rect() -> [i32; 4];
+    fn get_unit_rect() -> Rect<i32>;
+    fn get_kb_rect() -> Rect<i32>;
     fn get_event_list() -> &'static mut EventList;
     fn is_unit_highlighted(unit_no: i32) -> bool;
     fn get_selected_range() -> Selection;

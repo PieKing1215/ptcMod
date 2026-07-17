@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use winapi::um::winuser;
 
 use crate::{
@@ -9,9 +11,7 @@ use crate::{
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_PLAYHEAD_ID: u16 = winutil::next_id();
-}
+static M_PLAYHEAD_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub struct Playhead {
     patch: Vec<Patch>,
@@ -38,7 +38,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("note_rect_hook_patch: {:?}", e);
+                    log::warn!("note_rect_hook_patch: {e:?}");
                 }
             }
         }
@@ -82,7 +82,7 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
 
         let x = crate::feature::scroll_hook::LAST_PLAYHEAD_POS;
 
-        let rect = [x, unit_rect[1].min(kb_rect[1]), x + 2, unit_rect[3].max(kb_rect[3])];
+        let rect = [x, unit_rect.top.min(kb_rect.top), x + 2, unit_rect.bottom.max(kb_rect.bottom)];
         PTC::draw_rect(rect, 0xffcccccc);
     }
 }

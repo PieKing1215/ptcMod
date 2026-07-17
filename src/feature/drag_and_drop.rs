@@ -1,4 +1,4 @@
-use std::{ffi::CString, fs::File, intrinsics::transmute, path::PathBuf, ptr, string::ToString};
+use std::{ffi::CString, fs::File, mem::transmute, path::PathBuf, ptr, string::ToString, sync::LazyLock};
 
 use regex::Regex;
 use winapi::{
@@ -25,9 +25,7 @@ use crate::{
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_DRAGDROP_ID: u16 = winutil::next_id();
-}
+static M_DRAGDROP_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 static mut VTABLE: Option<IDropTargetVtbl> = None;
 
@@ -42,6 +40,7 @@ pub struct DragAndDrop {
 
 impl DragAndDrop {
     pub fn new<PTC: PTCVersion>() -> Self {
+        #[allow(clippy::missing_transmute_annotations)]
         unsafe {
             // the transmutes here are because the definitions in IDropTargetVtbl incorrectly
             //   use `*const POINTL` instead of `POINTL` which messes up pdw_effect
@@ -61,7 +60,7 @@ impl DragAndDrop {
 
         let data = DropHandlerData {
             drop_target: IDropTarget {
-                lpVtbl: unsafe { VTABLE.as_ref() }.unwrap() as *const IDropTargetVtbl,
+                lpVtbl: std::ptr::from_ref::<IDropTargetVtbl>(unsafe { VTABLE.as_ref() }.unwrap()),
             },
             state: DROPEFFECT_NONE,
         };
@@ -99,9 +98,9 @@ impl<PTC: PTCVersion> Feature<PTC> for DragAndDrop {
                         unsafe {
                             let r = OleInitialize(ptr::null_mut());
                             if r >= 0 {
-                                RegisterDragDrop(*PTC::get_hwnd(), &mut self.data.drop_target);
+                                RegisterDragDrop(*PTC::get_hwnd(), &raw mut self.data.drop_target);
                             } else {
-                                log::error!("OleInitialize failed: {}", r);
+                                log::error!("OleInitialize failed: {r}");
                             }
                         }
                     } else {
@@ -212,7 +211,7 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
                 pb.push("ptweb/");
                 std::fs::create_dir_all(pb.clone())
                     .map_err(|e| format!("Failed to create dirs: {e:?}"))
-                    .map(|_| (resp, pb))
+                    .map(|()| (resp, pb))
             })
             .and_then(|(resp, mut pb)| {
                 // try to extract filename from headers, otherwise use {id}.ptcop
@@ -245,6 +244,7 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
                 if pb.exists() {
                     Ok(pb)
                 } else {
+                    #[expect(clippy::unnecessary_debug_formatting, reason = "false positive")]
                     Err(format!("File still doesn't exist: {pb:?}"))
                 }
             });
@@ -277,7 +277,7 @@ unsafe fn get_text(p_data_obj: *const IDataObject) -> Option<String> {
     };
 
     let mut storage = std::mem::zeroed();
-    let r = (*p_data_obj).GetData(&format, &mut storage);
+    let r = (*p_data_obj).GetData(&raw const format, &raw mut storage);
     if r >= 0 {
         let data = (*storage.u).hGlobal();
         let txt = CString::from_raw((*data).cast::<i8>());

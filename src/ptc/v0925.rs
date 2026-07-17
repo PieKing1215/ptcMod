@@ -2,16 +2,9 @@ use std::{ffi::CString, slice};
 
 use crate::{
     feature::{
-        custom_note_rendering::{self, CustomNoteRendering},
-        drag_and_drop::DragAndDrop,
-        fps_display_fix::FPSDisplayFix,
-        fps_unlock::FPSUnlock,
-        playhead::{self, Playhead},
-        scroll_hook::{self, Scroll},
-        volume_muliply::VolumeAdjuster,
-        Feature,
+        Feature, custom_note_rendering::{self, CustomNoteRendering}, drag_and_drop::DragAndDrop, fps_display_fix::FPSDisplayFix, fps_unlock::FPSUnlock, playhead::{self, Playhead}, scroll_hook::{self, Scroll}, volume_muliply::VolumeAdjuster
     },
-    patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
+    patch::{Patch, hook_post_ret_new, hook_pre_ret_new, replace}, ptc::drawing::Rect,
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -265,13 +258,13 @@ impl PTCVersion for PTC0925 {
         .max(0)
     }
 
-    fn get_unit_rect() -> [i32; 4] {
+    fn get_unit_rect() -> Rect<i32> {
         // unsafe { *(addr(0xa693c) as *const [i32; 4]) }
-        unsafe { *(addr(0xa6cbc) as *const [i32; 4]) }
+        unsafe { *(addr(0xa6cbc) as *const Rect<i32>) }
     }
 
-    fn get_kb_rect() -> [i32; 4] {
-        unsafe { *(addr(0xa6a68) as *const [i32; 4]) }
+    fn get_kb_rect() -> Rect<i32> {
+        unsafe { *(addr(0xa6a68) as *const Rect<i32>) }
     }
 
     fn get_event_list() -> &'static mut super::events::EventList {
@@ -305,12 +298,12 @@ impl PTCVersion for PTC0925 {
             let mut clock_max = 0;
 
             (get_selected_range)(
-                &mut meas_min,
-                &mut beat_min,
-                &mut clock_min,
-                &mut meas_max,
-                &mut beat_max,
-                &mut clock_max,
+                &raw mut meas_min,
+                &raw mut beat_min,
+                &raw mut clock_min,
+                &raw mut meas_max,
+                &raw mut beat_max,
+                &raw mut clock_max,
             );
 
             Selection {
@@ -355,7 +348,7 @@ impl PTCVersion for PTC0925 {
                 unit_no: u32,
                 events_ptr: *mut *mut Event,
             ) -> i32 = std::mem::transmute(addr(0x8cd0) as *const ());
-            let count = (fill_events_for_unit)(unit_no as u32, &mut raw_events);
+            let count = (fill_events_for_unit)(unit_no as u32, &raw mut raw_events);
 
             // log::debug!("{count} {raw_events:?}");
 
@@ -424,6 +417,7 @@ impl PTCVersion for PTC0925 {
     }
 
     fn load_file_no_history(path: std::path::PathBuf) {
+        #[expect(clippy::unnecessary_debug_formatting, reason = "false positive")]
         unsafe {
             log::debug!("load_file_no_history({path:?})");
 
@@ -456,7 +450,7 @@ impl PTCVersion for PTC0925 {
                 unk: u8,
             ) -> u8 = std::mem::transmute(addr(0x25ef0) as *const ());
 
-            let ptr_2: *mut *mut libc::FILE = &mut file;
+            let ptr_2: *mut *mut libc::FILE = &raw mut file;
 
             log::debug!("read_file(...)");
             let r = (read_file)(*(addr(0xa4430) as *mut usize) as *mut _, ptr_2.cast(), 0);

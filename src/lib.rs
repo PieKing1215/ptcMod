@@ -10,9 +10,7 @@
 #![allow(clippy::cast_possible_wrap)]
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::missing_safety_doc)]
-// __thiscall calling convention is nightly only
-// Tracking issue: https://github.com/rust-lang/rust/issues/42202
-#![feature(abi_thiscall)]
+#![allow(static_mut_refs)] // TODO
 
 use std::convert::TryInto;
 
@@ -54,11 +52,10 @@ fn attach() -> anyhow::Result<()> {
             lptstr_filename.len().try_into().unwrap(),
         );
         let mut dw_handle: DWORD = 0;
-        let dw_size = GetFileVersionInfoSizeA(lptstr_filename.as_ptr(), &mut dw_handle);
+        let dw_size = GetFileVersionInfoSizeA(lptstr_filename.as_ptr(), &raw mut dw_handle);
 
         if dw_size > 0 {
-            let mut buf = Vec::new();
-            buf.resize(dw_size.try_into().unwrap(), 0);
+            let mut buf = vec![0; dw_size.try_into().unwrap()];
 
             if GetFileVersionInfoA(
                 lptstr_filename.as_ptr(),
@@ -73,7 +70,7 @@ fn attach() -> anyhow::Result<()> {
                     buf.as_mut_ptr().cast(),
                     "\\\0".bytes().collect::<Vec<u8>>().as_ptr().cast::<i8>(),
                     &mut lplp_buffer,
-                    &mut pu_len,
+                    &raw mut pu_len,
                 ) > 0
                 {
                     let v = std::slice::from_raw_parts(
@@ -184,9 +181,9 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
                     None => "Box<dyn Any>",
                 },
             };
-            println!("attach panicked: {}", msg);
+            println!("attach panicked: {msg}");
 
-            let l_msg: Vec<u16> = format!("attach panicked: {:?}\0", msg)
+            let l_msg: Vec<u16> = format!("attach panicked: {msg:?}\0")
                 .encode_utf16()
                 .collect();
             let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
@@ -198,7 +195,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
             );
         }
         Ok(Err(err)) => {
-            let l_msg: Vec<u16> = format!("attach exited with an Err: {:?}\0", err)
+            let l_msg: Vec<u16> = format!("attach exited with an Err: {err:?}\0")
                 .encode_utf16()
                 .collect();
             let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
@@ -214,7 +211,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
 
     match std::panic::catch_unwind(detach) {
         Err(err) => {
-            let l_msg: Vec<u16> = format!("detach panicked: {:?}\0", err)
+            let l_msg: Vec<u16> = format!("detach panicked: {err:?}\0")
                 .encode_utf16()
                 .collect();
             let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
@@ -226,7 +223,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
             );
         }
         Ok(Err(err)) => {
-            let l_msg: Vec<u16> = format!("detach exited with an Err: {:?}\0", err)
+            let l_msg: Vec<u16> = format!("detach exited with an Err: {err:?}\0")
                 .encode_utf16()
                 .collect();
             let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
@@ -262,11 +259,10 @@ pub unsafe extern "stdcall" fn DllMain(
                 std::ptr::null_mut(),
             );
         }
-        winapi::um::winnt::DLL_PROCESS_DETACH => {
-            if !lp_reserved.is_null() {
+        winapi::um::winnt::DLL_PROCESS_DETACH if !lp_reserved.is_null() => {
                 match std::panic::catch_unwind(detach) {
                     Err(err) => {
-                        let l_msg: Vec<u16> = format!("detach panicked: {:?}\0", err)
+                        let l_msg: Vec<u16> = format!("detach panicked: {err:?}\0")
                             .encode_utf16()
                             .collect();
                         let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
@@ -278,7 +274,7 @@ pub unsafe extern "stdcall" fn DllMain(
                         );
                     }
                     Ok(Err(err)) => {
-                        let l_msg: Vec<u16> = format!("detach exited with an Err: {:?}\0", err)
+                        let l_msg: Vec<u16> = format!("detach exited with an Err: {err:?}\0")
                             .encode_utf16()
                             .collect();
                         let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
@@ -292,7 +288,6 @@ pub unsafe extern "stdcall" fn DllMain(
                     Ok(Ok(())) => {}
                 }
             }
-        }
         _ => {}
     }
 

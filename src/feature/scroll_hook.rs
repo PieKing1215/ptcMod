@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{sync::LazyLock, time::Instant};
 
 use winapi::um::winuser;
 
@@ -10,10 +10,8 @@ use crate::{
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    pub(crate) static ref M_SCROLL_HOOK_ID: u16 = winutil::next_id();
-    pub(crate) static ref M_SMOOTH_SCROLL_ID: u16 = winutil::next_id();
-}
+pub(crate) static M_SCROLL_HOOK_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+pub(crate) static M_SMOOTH_SCROLL_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub(crate) static mut ENABLED: bool = false;
 
@@ -54,7 +52,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("note_rect_hook_patch: {:?}", e);
+                    log::warn!("note_rect_hook_patch: {e:?}");
                 }
             }
         }
@@ -140,7 +138,7 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
 
         let unit_rect = PTC::get_unit_rect();
 
-        let x = unit_rect[0] - *PTC::get_scroll() + LAST_SCROLL;
+        let x = unit_rect.left - *PTC::get_scroll() + LAST_SCROLL;
         LAST_PLAYHEAD_POS = x;
 
         winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);

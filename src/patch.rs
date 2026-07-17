@@ -33,7 +33,7 @@ impl Patch {
                 addr(self.addr) as *mut libc::c_void,
                 mem.len(),
                 PAGE_EXECUTE_READWRITE,
-                &mut lpfl_old_protect_1,
+                &raw mut lpfl_old_protect_1,
             );
 
             mem.copy_from_slice(&self.new);
@@ -42,10 +42,10 @@ impl Patch {
                 addr(self.addr) as *mut libc::c_void,
                 mem.len(),
                 lpfl_old_protect_1,
-                &mut lpfl_old_protect_1,
+                &raw mut lpfl_old_protect_1,
             );
 
-            log::debug!("-> {:x?}", mem);
+            log::debug!("-> {mem:x?}");
             Ok(())
         } else {
             Err(anyhow::anyhow!(
@@ -72,7 +72,7 @@ impl Patch {
                 addr(self.addr) as *mut libc::c_void,
                 mem.len(),
                 PAGE_EXECUTE_READWRITE,
-                &mut lpfl_old_protect,
+                &raw mut lpfl_old_protect,
             );
 
             mem.copy_from_slice(&self.old);
@@ -81,10 +81,10 @@ impl Patch {
                 addr(self.addr) as *mut libc::c_void,
                 mem.len(),
                 lpfl_old_protect,
-                &mut lpfl_old_protect,
+                &raw mut lpfl_old_protect,
             );
 
-            log::debug!("-> {:x?}", mem);
+            log::debug!("-> {mem:x?}");
 
             Ok(())
         } else {

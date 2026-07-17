@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use winapi::um::winuser;
 
 use crate::{
@@ -8,9 +10,7 @@ use crate::{
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_FPS_UNLOCK_ID: u16 = winutil::next_id();
-}
+static M_FPS_UNLOCK_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub struct FPSUnlock {
     patch: Vec<Patch>,
@@ -48,7 +48,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("note_rect_hook_patch: {:?}", e);
+                    log::warn!("note_rect_hook_patch: {e:?}");
                 }
             }
 

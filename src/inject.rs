@@ -1,9 +1,11 @@
 use std::ffi::CString;
+use std::ffi::c_void;
 use std::io;
 use std::mem;
 use std::path::Path;
 use std::ptr;
 
+use winapi::shared::minwindef::FARPROC;
 use winapi::shared::minwindef::LPCVOID;
 use winapi::um::handleapi::CloseHandle;
 use winapi::um::libloaderapi::GetModuleHandleA;
@@ -66,8 +68,8 @@ pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
     // find LoadLibraryA address
     println!("Looking for LoadLibraryA...");
     let load_library_a = unsafe {
-        let kernel = GetModuleHandleA(b"Kernel32.dll\0".as_ptr() as *const _);
-        GetProcAddress(kernel, b"LoadLibraryA\0".as_ptr() as *const _)
+        let kernel = GetModuleHandleA(c"Kernel32.dll".as_ptr() as *const _);
+        GetProcAddress(kernel, c"LoadLibraryA".as_ptr() as *const _)
     };
     println!("-> {:#p}", load_library_a);
 
@@ -78,7 +80,7 @@ pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
             process,
             ptr::null_mut(),
             0,
-            Some(mem::transmute(load_library_a)),
+            Some(mem::transmute::<FARPROC, unsafe extern "system" fn(*mut c_void) -> u32>(load_library_a)),
             path_addr,
             0,
             ptr::null_mut(),
