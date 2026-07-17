@@ -225,7 +225,7 @@ unsafe extern "system" fn hook_ex(code: i32, w_param: WPARAM, l_param: LPARAM) -
         // need to copy since we handle this on the main thread, so the pointer will be gone
         // (not sure if this is really safe or not)
         let msg = *(l_param.0 as *const MSG);
-        SENDER.get().unwrap().send(MsgType::WinMsg(msg)).unwrap();
+        let _ = SENDER.get().unwrap().send(MsgType::WinMsg(msg));
     }
 
     CallNextHookEx(None, code, w_param, l_param)

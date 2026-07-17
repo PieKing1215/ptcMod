@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use path_absolutize::Absolutize;
 use process_memory::{Pid, ProcessHandle, TryIntoProcessHandle};
-use sysinfo::{PidExt, ProcessExt, System, SystemExt};
+use sysinfo::System;
 use windows::Win32::Foundation::HANDLE;
 
 mod inject;
@@ -60,11 +60,11 @@ fn main() {
 
 fn get_ptc_handle() -> Option<ProcessHandle> {
     let mut s = System::new();
-    s.refresh_processes();
+    s.refresh_processes(sysinfo::ProcessesToUpdate::All, false);
     for (pid, process) in s.processes() {
         // println!("{} {}", pid, process.name());
         if process.name() == "ptCollage.exe" {
-            println!("Found {} with PID = {}", process.name(), pid);
+            println!("Found {} with PID = {}", process.name().display(), pid);
             let pp = pid.as_u32() as Pid;
             let ph = pp.try_into_process_handle();
             if let Ok(ph) = ph {
