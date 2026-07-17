@@ -1,12 +1,22 @@
 use std::sync::LazyLock;
 
 use colorsys::ColorTransform;
-use winapi::{shared::windef::{LPRECT, RECT}, um::winuser::{self}};
+use winapi::{
+    shared::windef::{LPRECT, RECT},
+    um::winuser::{self},
+};
 
 use crate::{
     patch::Patch,
     ptc::{
-        PTCVersion, addr, drawing::{Draw, Rect, color::Color, ddraw::{self, DDBLTFAST_SRCCOLORKEY}}, events::{Event, EventType}
+        addr,
+        drawing::{
+            color::Color,
+            ddraw::{self, DDBLTFAST_SRCCOLORKEY},
+            Draw, Rect,
+        },
+        events::{Event, EventType},
+        PTCVersion,
     },
     winutil::{self, Menus},
 };
@@ -34,10 +44,7 @@ pub struct CustomNoteRendering {
 
 impl CustomNoteRendering {
     pub fn new<PTC: PTCVersion>(draw_unit_notes_patch: Patch, draw_kb_notes_patch: Patch) -> Self {
-        Self {
-            draw_unit_notes_patch,
-            draw_kb_notes_patch,
-        }
+        Self { draw_unit_notes_patch, draw_kb_notes_patch }
     }
 }
 
@@ -304,10 +311,10 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         match eve.kind {
             EventType::Volume => {
                 cur_volume[u as usize] = eve.value;
-            }
+            },
             EventType::Velocity => {
                 cur_velocity[u as usize] = eve.value;
-            }
+            },
             EventType::On => {
                 #[allow(clippy::bool_to_int_with_if)]
                 let mut color = colors[if dim { 1 } else { 0 }];
@@ -351,23 +358,27 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                                 highlight_color = color.blend(Color::WHITE, flash_strength);
                                 color = color.blend(Color::WHITE, flash_strength * 0.75);
 
-                                let prev_eve_key_clock = get_event_at(
-                                    clock,
-                                    EventType::Key,
-                                    u,
-                                    eve_raw
-                                ).map_or(eve.clock, |key| key.clock);
-                                
+                                let prev_eve_key_clock =
+                                    get_event_at(clock, EventType::Key, u, eve_raw)
+                                        .map_or(eve.clock, |key| key.clock);
+
                                 let next_eve_key_clock = get_next_event(
                                     clock,
                                     eve.clock + eve.value,
                                     EventType::Key,
                                     u,
-                                    eve_raw
-                                ).map_or(eve.clock + eve.value, |key| key.clock);
+                                    eve_raw,
+                                )
+                                .map_or(eve.clock + eve.value, |key| key.clock);
 
-                                let x = (prev_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                                let x2 = (next_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
+                                let x = (prev_eve_key_clock * (*meas_width as i32)
+                                    / beat_clock as i32)
+                                    - ofs_x
+                                    + bounds.left;
+                                let x2 = (next_eve_key_clock * (*meas_width as i32)
+                                    / beat_clock as i32)
+                                    - ofs_x
+                                    + bounds.left;
 
                                 let note_rect = Rect::<i32>::new(
                                     (x).max(bounds.left),
@@ -621,7 +632,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                         );
                     }
                 }
-            }
+            },
             EventType::Key => {
                 let fade_color = if dim {
                     Color::from_argb(0xff200040)
@@ -640,7 +651,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                         draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
                     }
                 }
-            }
+            },
             _ => {
                 let x =
                     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
@@ -653,7 +664,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                         draw.fill_rect(&Rect::<i32>::new(x, y + 4, x + 2, y + 6), color);
                     }
                 }
-            }
+            },
         }
 
         eve_raw = eve.next;
@@ -853,7 +864,6 @@ pub(crate) unsafe fn draw_unit_note_rect<PTC: PTCVersion>(
     // }
 }
 
-
 // complete replacement for the vanilla keyboard notes drawing function
 // this allows for much easier modification
 #[allow(clippy::too_many_lines)]
@@ -922,7 +932,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
 
     let mut cur_y = (0..unit_num)
         .into_iter()
-        .map(|_u| (0x6C00 - 0x4500) * unit_height / 0x100 + unit_height/2)
+        .map(|_u| (0x6C00 - 0x4500) * unit_height / 0x100 + unit_height / 2)
         .collect::<Vec<_>>();
 
     let mut eve_raw = events_list.start;
@@ -938,7 +948,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         let u = eve.unit as i32;
 
         let dim = !highlighted[u as usize];
-        
+
         if dim {
             eve_raw = eve.next;
             continue;
@@ -949,10 +959,10 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         match eve.kind {
             EventType::Volume => {
                 cur_volume[u as usize] = eve.value;
-            }
+            },
             EventType::Velocity => {
                 cur_velocity[u as usize] = eve.value;
-            }
+            },
             EventType::On => {
                 #[allow(clippy::bool_to_int_with_if)]
                 let mut color = colors[if dim { 1 } else { 0 }];
@@ -996,24 +1006,33 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                                 highlight_color = color.blend(Color::WHITE, flash_strength);
                                 color = color.blend(Color::WHITE, flash_strength * 0.75);
 
-                                let (prev_eve_key_clock, prev_eve_key_value) = get_event_at(
-                                    clock,
-                                    EventType::Key,
-                                    u,
-                                    eve_raw
-                                ).map_or((eve.clock, eve.value), |key| (key.clock, key.value));
-                                
+                                let (prev_eve_key_clock, prev_eve_key_value) =
+                                    get_event_at(clock, EventType::Key, u, eve_raw)
+                                        .map_or((eve.clock, eve.value), |key| {
+                                            (key.clock, key.value)
+                                        });
+
                                 let next_eve_key_clock = get_next_event(
                                     clock,
                                     eve.clock + eve.value,
                                     EventType::Key,
                                     u,
-                                    eve_raw
-                                ).map_or(eve.clock + eve.value, |key| key.clock);
+                                    eve_raw,
+                                )
+                                .map_or(eve.clock + eve.value, |key| key.clock);
 
-                                let x = (prev_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                                let x2 = (next_eve_key_clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                                let note = (0x6C00 - 0x4500 - (prev_eve_key_value - 0x6000)) / 0x100 * unit_height + unit_height / 2;
+                                let x = (prev_eve_key_clock * (*meas_width as i32)
+                                    / beat_clock as i32)
+                                    - ofs_x
+                                    + bounds.left;
+                                let x2 = (next_eve_key_clock * (*meas_width as i32)
+                                    / beat_clock as i32)
+                                    - ofs_x
+                                    + bounds.left;
+                                let note = (0x6C00 - 0x4500 - (prev_eve_key_value - 0x6000))
+                                    / 0x100
+                                    * unit_height
+                                    + unit_height / 2;
                                 let y = bounds.top + note - ofs_y;
 
                                 let note_rect = Rect::<i32>::new(
@@ -1142,7 +1161,6 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 if do_batching {
                     batch_a.push((note_rect, color));
                 } else {
-
                     let mut cur_eve: &Event = eve;
                     let mut next_key = cur_y[u as usize];
                     #[allow(clippy::while_let_loop)]
@@ -1152,16 +1170,18 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                             eve.clock + eve.value,
                             EventType::Key,
                             u,
-                            eve_raw
+                            eve_raw,
                         ) {
-                            let x =
-                                (cur_eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                            let x2 = ((next_eve_key.clock) * (*meas_width as i32) / beat_clock as i32)
+                            let x = (cur_eve.clock * (*meas_width as i32) / beat_clock as i32)
+                                - ofs_x
+                                + bounds.left;
+                            let x2 = ((next_eve_key.clock) * (*meas_width as i32)
+                                / beat_clock as i32)
                                 - ofs_x
                                 + bounds.left;
 
                             let y = bounds.top + next_key - ofs_y;
-                                
+
                             let note_rect = Rect::<i32>::new(
                                 (x).max(bounds.left),
                                 (y - 4).max(bounds.top),
@@ -1170,17 +1190,21 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                             );
                             draw.fill_rect(&note_rect, color);
 
-                            next_key = (0x6C00 - 0x4500 - (next_eve_key.value - 0x6000)) / 0x100 * unit_height + unit_height / 2;
+                            next_key = (0x6C00 - 0x4500 - (next_eve_key.value - 0x6000)) / 0x100
+                                * unit_height
+                                + unit_height / 2;
                             cur_eve = next_eve_key;
                         } else {
-                            let x =
-                                (cur_eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                            let x2 = ((eve.clock + eve.value) * (*meas_width as i32) / beat_clock as i32)
+                            let x = (cur_eve.clock * (*meas_width as i32) / beat_clock as i32)
+                                - ofs_x
+                                + bounds.left;
+                            let x2 = ((eve.clock + eve.value) * (*meas_width as i32)
+                                / beat_clock as i32)
                                 - ofs_x
                                 + bounds.left;
 
                             let y = bounds.top + next_key - ofs_y;
-                                
+
                             let note_rect = Rect::<i32>::new(
                                 (x).max(bounds.left),
                                 (y - 4).max(bounds.top),
@@ -1191,7 +1215,6 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                             break;
                         }
                     }
-
                 }
 
                 if let Some(hl) = highlight_rect {
@@ -1317,9 +1340,10 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 //         );
                 //     }
                 // }
-            }
+            },
             EventType::Key => {
-                cur_y[u as usize] = (0x6C00 - 0x4500 - (eve.value - 0x6000)) / 0x100 * unit_height + unit_height / 2;
+                cur_y[u as usize] = (0x6C00 - 0x4500 - (eve.value - 0x6000)) / 0x100 * unit_height
+                    + unit_height / 2;
 
                 // let fade_color = if dim {
                 //     Color::from_argb(0xff200040)
@@ -1338,7 +1362,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 //         draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
                 //     }
                 // }
-            }
+            },
             _ => {
                 // let x =
                 //     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
@@ -1350,7 +1374,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 //         draw.fill_rect(&Rect::<i32>::new(x, y + 4, x + 2, y + 6), color);
                 //     }
                 // }
-            }
+            },
         }
 
         eve_raw = eve.next;

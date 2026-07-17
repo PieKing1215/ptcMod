@@ -14,13 +14,15 @@ use crate::{feature::Feature, ptc::drawing::Rect};
 
 use self::events::{Event, EventList};
 
-static BASE_ADDR: LazyLock<usize> = LazyLock::new(|| unsafe { GetModuleHandleA(
+static BASE_ADDR: LazyLock<usize> = LazyLock::new(|| unsafe {
+    GetModuleHandleA(
         "ptCollage.exe\0"
             .bytes()
             .collect::<Vec<u8>>()
             .as_ptr()
             .cast::<i8>(),
-    ) as usize });
+    ) as usize
+});
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Selection {

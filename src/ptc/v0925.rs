@@ -2,9 +2,17 @@ use std::{ffi::CString, slice};
 
 use crate::{
     feature::{
-        Feature, custom_note_rendering::{self, CustomNoteRendering}, drag_and_drop::DragAndDrop, fps_display_fix::FPSDisplayFix, fps_unlock::FPSUnlock, playhead::{self, Playhead}, scroll_hook::{self, Scroll}, volume_muliply::VolumeAdjuster
+        custom_note_rendering::{self, CustomNoteRendering},
+        drag_and_drop::DragAndDrop,
+        fps_display_fix::FPSDisplayFix,
+        fps_unlock::FPSUnlock,
+        playhead::{self, Playhead},
+        scroll_hook::{self, Scroll},
+        volume_muliply::VolumeAdjuster,
+        Feature,
     },
-    patch::{Patch, hook_post_ret_new, hook_pre_ret_new, replace}, ptc::drawing::Rect,
+    patch::{hook_post_ret_new, hook_pre_ret_new, replace, Patch},
+    ptc::drawing::Rect,
 };
 use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
@@ -123,7 +131,8 @@ impl PTCVersion for PTC0925 {
             custom_note_rendering::draw_kb_notes::<PTC0925>
         );
 
-        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(draw_unit_notes, draw_kb_notes);
+        let f_custom_note_rendering =
+            CustomNoteRendering::new::<Self>(draw_unit_notes, draw_kb_notes);
 
         // playhead
 
@@ -218,8 +227,8 @@ impl PTCVersion for PTC0925 {
 
     fn get_tempo() -> &'static mut f32 {
         unsafe {
-            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize)
-                + 0x4) as *mut f32)
+            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize) + 0x4)
+                as *mut f32)
         }
     }
 

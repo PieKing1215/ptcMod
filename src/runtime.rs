@@ -1,4 +1,8 @@
-use std::{convert::TryInto, mem::MaybeUninit, sync::{LazyLock, mpsc::Sender}};
+use std::{
+    convert::TryInto,
+    mem::MaybeUninit,
+    sync::{mpsc::Sender, LazyLock},
+};
 
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
@@ -144,7 +148,7 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                         MsgType::Uninject => break,
                         MsgType::WinMsg(msg) => {
                             self.on_win_msg(msg);
-                        }
+                        },
                     }
                 }
 

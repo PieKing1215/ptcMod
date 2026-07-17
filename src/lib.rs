@@ -193,7 +193,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
                 l_title.as_ptr(),
                 winuser::MB_OK | winuser::MB_ICONERROR,
             );
-        }
+        },
         Ok(Err(err)) => {
             let l_msg: Vec<u16> = format!("attach exited with an Err: {err:?}\0")
                 .encode_utf16()
@@ -205,8 +205,8 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
                 l_title.as_ptr(),
                 winuser::MB_OK | winuser::MB_ICONERROR,
             );
-        }
-        Ok(Ok(())) => {}
+        },
+        Ok(Ok(())) => {},
     }
 
     match std::panic::catch_unwind(detach) {
@@ -221,7 +221,7 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
                 l_title.as_ptr(),
                 winuser::MB_OK | winuser::MB_ICONERROR,
             );
-        }
+        },
         Ok(Err(err)) => {
             let l_msg: Vec<u16> = format!("detach exited with an Err: {err:?}\0")
                 .encode_utf16()
@@ -233,8 +233,8 @@ unsafe extern "system" fn attach_wrapper(base: LPVOID) -> u32 {
                 l_title.as_ptr(),
                 winuser::MB_OK | winuser::MB_ICONERROR,
             );
-        }
-        Ok(Ok(())) => {}
+        },
+        Ok(Ok(())) => {},
     }
 
     FreeLibraryAndExitThread(base.cast(), 1);
@@ -258,37 +258,37 @@ pub unsafe extern "stdcall" fn DllMain(
                 0,
                 std::ptr::null_mut(),
             );
-        }
+        },
         winapi::um::winnt::DLL_PROCESS_DETACH if !lp_reserved.is_null() => {
-                match std::panic::catch_unwind(detach) {
-                    Err(err) => {
-                        let l_msg: Vec<u16> = format!("detach panicked: {err:?}\0")
-                            .encode_utf16()
-                            .collect();
-                        let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-                        winuser::MessageBoxW(
-                            std::ptr::null_mut(),
-                            l_msg.as_ptr(),
-                            l_title.as_ptr(),
-                            winuser::MB_OK | winuser::MB_ICONERROR,
-                        );
-                    }
-                    Ok(Err(err)) => {
-                        let l_msg: Vec<u16> = format!("detach exited with an Err: {err:?}\0")
-                            .encode_utf16()
-                            .collect();
-                        let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
-                        winuser::MessageBoxW(
-                            std::ptr::null_mut(),
-                            l_msg.as_ptr(),
-                            l_title.as_ptr(),
-                            winuser::MB_OK | winuser::MB_ICONERROR,
-                        );
-                    }
-                    Ok(Ok(())) => {}
-                }
+            match std::panic::catch_unwind(detach) {
+                Err(err) => {
+                    let l_msg: Vec<u16> = format!("detach panicked: {err:?}\0")
+                        .encode_utf16()
+                        .collect();
+                    let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
+                    winuser::MessageBoxW(
+                        std::ptr::null_mut(),
+                        l_msg.as_ptr(),
+                        l_title.as_ptr(),
+                        winuser::MB_OK | winuser::MB_ICONERROR,
+                    );
+                },
+                Ok(Err(err)) => {
+                    let l_msg: Vec<u16> = format!("detach exited with an Err: {err:?}\0")
+                        .encode_utf16()
+                        .collect();
+                    let l_title: Vec<u16> = "PTC Mod\0".encode_utf16().collect();
+                    winuser::MessageBoxW(
+                        std::ptr::null_mut(),
+                        l_msg.as_ptr(),
+                        l_title.as_ptr(),
+                        winuser::MB_OK | winuser::MB_ICONERROR,
+                    );
+                },
+                Ok(Ok(())) => {},
             }
-        _ => {}
+        },
+        _ => {},
     }
 
     1

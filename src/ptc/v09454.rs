@@ -8,7 +8,8 @@ use crate::{
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{Patch, hook, hook_pre_ret_new}, ptc::drawing::Rect,
+    patch::{hook, hook_pre_ret_new, Patch},
+    ptc::drawing::Rect,
 };
 
 use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion, Selection};

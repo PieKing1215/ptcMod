@@ -82,7 +82,12 @@ pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
 
         let x = crate::feature::scroll_hook::LAST_PLAYHEAD_POS;
 
-        let rect = [x, unit_rect.top.min(kb_rect.top), x + 2, unit_rect.bottom.max(kb_rect.bottom)];
+        let rect = [
+            x,
+            unit_rect.top.min(kb_rect.top),
+            x + 2,
+            unit_rect.bottom.max(kb_rect.bottom),
+        ];
         PTC::draw_rect(rect, 0xffcccccc);
     }
 }

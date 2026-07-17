@@ -1,4 +1,6 @@
-use std::{ffi::CString, fs::File, mem::transmute, path::PathBuf, ptr, string::ToString, sync::LazyLock};
+use std::{
+    ffi::CString, fs::File, mem::transmute, path::PathBuf, ptr, string::ToString, sync::LazyLock,
+};
 
 use regex::Regex;
 use winapi::{
@@ -260,7 +262,7 @@ unsafe extern "system" fn drop<PTC: PTCVersion>(
                 // remove the temp file
                 log::info!("remove_file: {:?}", std::fs::remove_file(pb));
                 log::info!("Deleted tempfile.");
-            }
+            },
         }
     }
 

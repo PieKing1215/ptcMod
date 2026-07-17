@@ -1,5 +1,5 @@
-use std::ffi::CString;
 use std::ffi::c_void;
+use std::ffi::CString;
 use std::io;
 use std::mem;
 use std::path::Path;
@@ -80,7 +80,10 @@ pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
             process,
             ptr::null_mut(),
             0,
-            Some(mem::transmute::<FARPROC, unsafe extern "system" fn(*mut c_void) -> u32>(load_library_a)),
+            Some(mem::transmute::<
+                FARPROC,
+                unsafe extern "system" fn(*mut c_void) -> u32,
+            >(load_library_a)),
             path_addr,
             0,
             ptr::null_mut(),
