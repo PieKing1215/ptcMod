@@ -39,10 +39,50 @@ impl<T: std::ops::Sub<Output = T> + Copy> Rect<T> {
     }
 }
 
+impl<T: std::ops::Add<Output = T> + Copy> Rect<T> {
+    pub fn offset(&self, x: T, y: T) -> Self {
+        Self {
+            left: self.left + x,
+            top: self.top + y,
+            right: self.right + x,
+            bottom: self.bottom + y,
+        }
+    }
+}
+
 pub trait Draw {
     unsafe fn fill_rect(&self, rect: &Rect<i32>, color: Color);
 
     #[deprecated = "ddraw doesn't actually implement this so it's useless"]
     #[expect(unused)]
     unsafe fn fill_rect_batch(&self, rects: Vec<Rect<i32>>, color: Color);
+
+    fn offset(&self, x: i32, y: i32) -> impl Draw
+    where
+        Self: Sized,
+    {
+        OffsetDraw { inner: self, x, y }
+    }
+}
+
+struct OffsetDraw<'a, T> {
+    inner: &'a T,
+    x: i32,
+    y: i32,
+}
+
+impl<T: Draw> Draw for OffsetDraw<'_, T> {
+    unsafe fn fill_rect(&self, rect: &Rect<i32>, color: Color) {
+        let ofs_rect = rect.offset(self.x, self.y);
+        self.inner.fill_rect(&ofs_rect, color);
+    }
+
+    unsafe fn fill_rect_batch(&self, rects: Vec<Rect<i32>>, color: Color) {
+        let ofs_rects = rects
+            .into_iter()
+            .map(|rect| rect.offset(self.x, self.y))
+            .collect();
+        #[expect(deprecated)]
+        self.inner.fill_rect_batch(ofs_rects, color);
+    }
 }

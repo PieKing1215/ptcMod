@@ -28,11 +28,16 @@ static M_CUSTOM_RENDERING_ENABLED_ID: LazyLock<u16> = LazyLock::new(winutil::nex
 static M_NOTE_PULSE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 static M_VOLUME_FADE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 static M_COLORED_UNITS_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_SEPARATE_SURFACE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 // store our own values instead since calling winapi in the draw loop would be slow
 static mut NOTE_PULSE: bool = true;
 static mut VOLUME_FADE: bool = true;
 static mut COLORED_UNITS: bool = true;
+/// can perform better in some scenarios<br/>
+/// eg. true was better at the time I added it on windows<br/>
+/// but false is better for me on wine
+static mut USE_SEPARATE_SURFACE: bool = false;
 
 // static mut DCRT: Option<&'static mut ID2D1DCRenderTarget> = None;
 static SURF: RwLock<Option<(Rect<i32>, ForceSendSync<IDirectDrawSurface>)>> = RwLock::new(None);
@@ -75,6 +80,13 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             );
             winutil::add_menu_toggle(menu, "Volume Fade", *M_VOLUME_FADE_ID, VOLUME_FADE, false);
             winutil::add_menu_toggle(menu, "Note Pulse", *M_NOTE_PULSE_ID, NOTE_PULSE, false);
+            winutil::add_menu_toggle(
+                menu,
+                "Use Separate Surface",
+                *M_SEPARATE_SURFACE_ID,
+                USE_SEPARATE_SURFACE,
+                false,
+            );
         }
     }
 
@@ -121,6 +133,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         }
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, true);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, true);
+                        winutil::set_menu_enabled(msg.hwnd, *M_SEPARATE_SURFACE_ID, true);
                     } else {
                         unsafe { self.draw_unit_notes_patch.unapply() }.unwrap();
                         unsafe { self.draw_kb_notes_patch.unapply() }.unwrap();
@@ -128,6 +141,7 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_NOTE_PULSE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, false);
+                        winutil::set_menu_enabled(msg.hwnd, *M_SEPARATE_SURFACE_ID, false);
                     }
                     unsafe {
                         InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
@@ -145,6 +159,12 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                 } else if low == *M_COLORED_UNITS_ID {
                     unsafe {
                         COLORED_UNITS = winutil::menu_toggle(msg.hwnd, *M_COLORED_UNITS_ID);
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
+                    }
+                } else if low == *M_SEPARATE_SURFACE_ID {
+                    unsafe {
+                        USE_SEPARATE_SURFACE =
+                            winutil::menu_toggle(msg.hwnd, *M_SEPARATE_SURFACE_ID);
                         InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
@@ -292,7 +312,23 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         ));
     }
 
-    let draw = &surf.as_mut().unwrap().1 .0;
+    let draw = if USE_SEPARATE_SURFACE {
+        &surf.as_mut().unwrap().1 .0
+    } else {
+        real_draw
+    };
+    let draw = draw.offset(
+        if USE_SEPARATE_SURFACE {
+            0
+        } else {
+            unit_area.left
+        },
+        if USE_SEPARATE_SURFACE {
+            0
+        } else {
+            unit_area.top
+        },
+    );
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
 
@@ -310,7 +346,12 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     // TODO: this is stupid
     let do_batching = false;
 
-    draw.fill_rect(&bounds, Color::from_argb(0xff000000));
+    if USE_SEPARATE_SURFACE {
+        draw.fill_rect(&bounds, Color::from_argb(0xff000000));
+    }
+
+    let mut count = 0;
+    let mut culled = 0;
 
     let mut eve_raw = events_list.start;
     while !eve_raw.is_null() {
@@ -326,6 +367,13 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
         let dim = !highlighted[u as usize];
         let y = bounds.top + u * unit_height + unit_height / 2 - ofs_y;
+
+        // y is the center of the unit so this culls when the center goes offscreen
+        if y < bounds.top || y > bounds.bottom {
+            culled += 1;
+            eve_raw = eve.next;
+            continue;
+        }
 
         match eve.kind {
             EventType::Volume => {
@@ -353,9 +401,15 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                 let note_rect = Rect::<i32>::new(
                     (x + 2).max(bounds.left),
                     (y - 2).max(bounds.top),
-                    (x2 - 2).min(bounds.right),
+                    (x2 - 1).min(bounds.right),
                     (y + 2).min(bounds.bottom),
                 );
+
+                if note_rect.right < bounds.left || note_rect.left > bounds.right + 1 {
+                    culled += 1;
+                    eve_raw = eve.next;
+                    continue;
+                }
 
                 let mut highlight_rect = None;
                 if PTC::is_playing() && (NOTE_PULSE || VOLUME_FADE) {
@@ -400,7 +454,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                                     + bounds.left;
 
                                 let note_rect = Rect::<i32>::new(
-                                    (x).max(bounds.left),
+                                    (x).max(bounds.left).max(note_rect.left),
                                     (y - 2).max(bounds.top),
                                     (x2 - 1).min(bounds.right),
                                     (y + 2).min(bounds.bottom),
@@ -522,10 +576,13 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     }
                 }
 
-                if do_batching {
-                    batch_a.push((note_rect, color));
-                } else {
-                    draw.fill_rect(&note_rect, color);
+                if highlight_rect != Some(note_rect) {
+                    if do_batching {
+                        batch_a.push((note_rect, color));
+                    } else {
+                        draw.fill_rect(&note_rect, color);
+                        count += 1;
+                    }
                 }
 
                 if let Some(hl) = highlight_rect {
@@ -533,32 +590,11 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                         batch_a.push((hl, highlight_color));
                     } else {
                         draw.fill_rect(&hl, highlight_color);
+                        count += 1;
                     }
                 }
 
                 if x > bounds.left - 2 {
-                    if do_batching {
-                        batch_a.push((
-                            Rect::<i32>::new(
-                                note_rect.left - 1,
-                                note_rect.top - 1,
-                                note_rect.left,
-                                note_rect.bottom + 1,
-                            ),
-                            color,
-                        ));
-                    } else {
-                        draw.fill_rect(
-                            &Rect::<i32>::new(
-                                note_rect.left - 1,
-                                note_rect.top - 1,
-                                note_rect.left,
-                                note_rect.bottom + 1,
-                            ),
-                            color,
-                        );
-                    }
-
                     // left edge
                     if do_batching {
                         batch_a.push((
@@ -580,61 +616,66 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                             ),
                             color,
                         );
-                    }
-
-                    if do_batching {
-                        batch_a.push((
-                            Rect::<i32>::new(
-                                note_rect.left - 2,
-                                note_rect.top - 3,
-                                note_rect.left - 1,
-                                note_rect.bottom + 3,
-                            ),
-                            color,
-                        ));
-                    } else {
-                        draw.fill_rect(
-                            &Rect::<i32>::new(
-                                note_rect.left - 2,
-                                note_rect.top - 3,
-                                note_rect.left - 1,
-                                note_rect.bottom + 3,
-                            ),
-                            color,
-                        );
+                        count += 1;
                     }
                 }
 
-                if note_rect.right > bounds.left {
-                    // right edge
+                if x > bounds.left - 1 {
                     if do_batching {
                         batch_a.push((
                             Rect::<i32>::new(
-                                note_rect.right,
-                                note_rect.top,
-                                note_rect.right + 1,
-                                note_rect.bottom,
+                                note_rect.left - 2,
+                                note_rect.top - 3,
+                                note_rect.left - 1,
+                                note_rect.bottom + 3,
                             ),
                             color,
                         ));
                     } else {
                         draw.fill_rect(
                             &Rect::<i32>::new(
-                                note_rect.right,
-                                note_rect.top,
-                                note_rect.right + 1,
-                                note_rect.bottom,
+                                note_rect.left - 2,
+                                note_rect.top - 3,
+                                note_rect.left - 1,
+                                note_rect.bottom + 3,
                             ),
                             color,
                         );
+                        count += 1;
                     }
+                }
+
+                if note_rect.right > bounds.left - 1 && note_rect.right < bounds.right {
+                    // right edge
+                    // if do_batching {
+                    //     batch_a.push((
+                    //         Rect::<i32>::new(
+                    //             note_rect.right,
+                    //             note_rect.top,
+                    //             note_rect.right + 1,
+                    //             note_rect.bottom,
+                    //         ),
+                    //         color,
+                    //     ));
+                    // } else {
+                    //     draw.fill_rect(
+                    //         &Rect::<i32>::new(
+                    //             note_rect.right,
+                    //             note_rect.top,
+                    //             note_rect.right + 1,
+                    //             note_rect.bottom,
+                    //         ),
+                    //         color,
+                    //     );
+                    //     count += 1;
+                    // }
 
                     if do_batching {
                         batch_a.push((
                             Rect::<i32>::new(
-                                note_rect.right + 1,
+                                note_rect.right,
                                 note_rect.top + 1,
-                                note_rect.right + 2,
+                                note_rect.right + 1,
                                 note_rect.bottom - 1,
                             ),
                             color,
@@ -642,13 +683,14 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                     } else {
                         draw.fill_rect(
                             &Rect::<i32>::new(
-                                note_rect.right + 1,
+                                note_rect.right,
                                 note_rect.top + 1,
-                                note_rect.right + 2,
+                                note_rect.right + 1,
                                 note_rect.bottom - 1,
                             ),
                             color,
                         );
+                        count += 1;
                     }
                 }
             },
@@ -661,32 +703,38 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
 
                 let x =
                     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                if x > bounds.left - 2 {
+                if x > bounds.left - 1 && x < bounds.right {
                     if do_batching {
                         batch_a.push((Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color));
                         batch_a.push((Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color));
                     } else {
                         draw.fill_rect(&Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color);
                         draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
+                        count += 2;
                     }
                 }
             },
             _ => {
                 let x =
                     (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                if x > bounds.left - 2 {
+                if x > bounds.left - 2 && x < bounds.right - 1 {
                     #[allow(clippy::bool_to_int_with_if)]
                     let color = Color::from_argb([0xff00f080, 0x007840][if dim { 1 } else { 0 }]);
                     if do_batching {
                         batch_a.push((Rect::<i32>::new(x, y + 4, x + 2, y + 6), color));
                     } else {
                         draw.fill_rect(&Rect::<i32>::new(x, y + 4, x + 2, y + 6), color);
+                        count += 1;
                     }
                 }
             },
         }
 
         eve_raw = eve.next;
+    }
+
+    if false {
+        log::debug!("rects = {count} / {culled}");
     }
 
     if do_batching {
@@ -708,24 +756,28 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     //     ddbltfx.as_mut_ptr().cast(),
     // );
 
-    let mut unit_rect = PTC::get_unit_rect();
-    let dst_rect = unit_rect.as_lprect();
-    let mut src_rect = RECT {
-        left: 0,
-        top: 0,
-        right: bounds.width(),
-        bottom: bounds.height(),
-    };
+    drop(draw);
 
-    real_draw
-        .BltFast(
-            (*dst_rect).left as u32,
-            (*dst_rect).top as u32,
-            &surf.as_mut().unwrap().1 .0,
-            &raw mut src_rect,
-            DDBLTFAST_SRCCOLORKEY,
-        )
-        .unwrap();
+    if USE_SEPARATE_SURFACE {
+        let mut unit_rect = PTC::get_unit_rect();
+        let dst_rect = unit_rect.as_lprect();
+        let mut src_rect = RECT {
+            left: 0,
+            top: 0,
+            right: bounds.width(),
+            bottom: bounds.height(),
+        };
+
+        real_draw
+            .BltFast(
+                (*dst_rect).left as u32,
+                (*dst_rect).top as u32,
+                &surf.as_mut().unwrap().1 .0,
+                &raw mut src_rect,
+                DDBLTFAST_SRCCOLORKEY,
+            )
+            .unwrap();
+    }
 }
 
 /// Old function to override drawing individual notes
@@ -933,7 +985,23 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         ));
     }
 
-    let draw = &surf.as_mut().unwrap().1 .0;
+    let draw = if USE_SEPARATE_SURFACE {
+        &surf.as_mut().unwrap().1 .0
+    } else {
+        real_draw
+    };
+    let draw = draw.offset(
+        if USE_SEPARATE_SURFACE {
+            0
+        } else {
+            unit_area.left
+        },
+        if USE_SEPARATE_SURFACE {
+            0
+        } else {
+            unit_area.top
+        },
+    );
 
     let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
 
@@ -951,7 +1019,9 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     // TODO: this is stupid
     let do_batching = false;
 
-    draw.fill_rect(&bounds, Color::from_argb(0xff000000));
+    if USE_SEPARATE_SURFACE {
+        draw.fill_rect(&bounds, Color::from_argb(0xff000000));
+    }
 
     let mut cur_y = (0..unit_num)
         .into_iter()
@@ -1008,6 +1078,11 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                     (x2).min(bounds.right),
                     (y + 4).min(bounds.bottom),
                 );
+
+                if note_rect.right < bounds.left || note_rect.left > bounds.right + 1 {
+                    eve_raw = eve.next;
+                    continue;
+                }
 
                 let mut highlight_rect = None;
                 if PTC::is_playing() && (NOTE_PULSE || VOLUME_FADE) {
@@ -1408,18 +1483,23 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
             draw.fill_rect(&rect, color);
         }
     }
-    let mut ddbltfx = [0_u32; 25];
-    ddbltfx[0] = 100;
-    ddbltfx[23] = 0;
-    ddbltfx[24] = 0;
 
-    real_draw
-        .Blt(
-            unit_area.as_lprect(),
-            &surf.as_mut().unwrap().1 .0,
-            std::ptr::null_mut(),
-            0x00010000 | 0x1000000,
-            ddbltfx.as_mut_ptr().cast(),
-        )
-        .unwrap();
+    drop(draw);
+
+    if USE_SEPARATE_SURFACE {
+        let mut ddbltfx = [0_u32; 25];
+        ddbltfx[0] = 100;
+        ddbltfx[23] = 0;
+        ddbltfx[24] = 0;
+
+        real_draw
+            .Blt(
+                unit_area.as_lprect(),
+                &surf.as_mut().unwrap().1 .0,
+                std::ptr::null_mut(),
+                0x00010000 | 0x1000000,
+                ddbltfx.as_mut_ptr().cast(),
+            )
+            .unwrap();
+    }
 }
