@@ -1,20 +1,20 @@
 use std::sync::LazyLock;
 
 use windows::{
-    core::PCSTR,
     Win32::{
         Foundation::{HWND, LPARAM, WPARAM},
         UI::WindowsAndMessaging::{
-            DialogBoxParamA, EndDialog, GetDlgItemInt, GetDlgItemTextA, SetDlgItemInt,
-            SetDlgItemTextA, MSG, WM_COMMAND, WM_INITDIALOG,
+            DialogBoxParamA, EndDialog, GetDlgItemInt, GetDlgItemTextA, MSG, SetDlgItemInt,
+            SetDlgItemTextA, WM_COMMAND, WM_INITDIALOG,
         },
     },
+    core::PCSTR,
 };
 
 use crate::{
     feature::dialog_input_width,
-    ptc::{events::EventType, PTCVersion},
-    winutil::{self, hiword, loword, Menus},
+    ptc::{PTCVersion, events::EventType},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;

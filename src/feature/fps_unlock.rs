@@ -4,8 +4,8 @@ use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_COMMAND};
 
 use crate::{
     patch::Patch,
-    ptc::{addr, PTCVersion},
-    winutil::{self, hiword, loword, Menus},
+    ptc::{PTCVersion, addr},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;

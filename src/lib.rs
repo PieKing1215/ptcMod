@@ -14,20 +14,20 @@
 use std::{convert::TryInto, ffi::c_void};
 
 use windows::{
-    core::{PCSTR, PCWSTR},
     Win32::{
         Foundation::{HINSTANCE, HMODULE},
         Storage::FileSystem::{GetFileVersionInfoA, GetFileVersionInfoSizeA, VerQueryValueA},
         System::{
-            Console::{AttachConsole, ATTACH_PARENT_PROCESS},
+            Console::{ATTACH_PARENT_PROCESS, AttachConsole},
             LibraryLoader::{
                 DisableThreadLibraryCalls, FreeLibraryAndExitThread, GetModuleFileNameA,
             },
             SystemServices::{DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH},
             Threading::{CreateThread, THREAD_CREATION_FLAGS},
         },
-        UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK},
+        UI::WindowsAndMessaging::{MB_ICONERROR, MB_OK, MessageBoxW},
     },
+    core::{PCSTR, PCWSTR},
 };
 
 #[cfg(not(target_os = "windows"))]
@@ -242,7 +242,7 @@ unsafe extern "system" fn attach_wrapper(base: *mut c_void) -> u32 {
     FreeLibraryAndExitThread(HMODULE(base), 1);
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "stdcall" fn DllMain(
     hinst_dll: HINSTANCE,
     fdw_reason: u32,

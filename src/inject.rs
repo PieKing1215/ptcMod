@@ -3,17 +3,17 @@ use std::io;
 use std::mem;
 use std::path::Path;
 
-use windows::core::PCSTR;
 use windows::Win32::Foundation::CloseHandle;
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
 use windows::Win32::System::LibraryLoader::GetModuleHandleA;
 use windows::Win32::System::LibraryLoader::GetProcAddress;
-use windows::Win32::System::Memory::VirtualAllocEx;
 use windows::Win32::System::Memory::MEM_COMMIT;
 use windows::Win32::System::Memory::MEM_RESERVE;
 use windows::Win32::System::Memory::PAGE_READWRITE;
+use windows::Win32::System::Memory::VirtualAllocEx;
 use windows::Win32::System::Threading::CreateRemoteThread;
+use windows::core::PCSTR;
 
 /// Injects the dll at `dll_path` into the given process
 pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {

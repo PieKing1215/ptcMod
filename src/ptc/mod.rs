@@ -6,11 +6,11 @@ pub mod v09454;
 use std::{path::PathBuf, sync::LazyLock};
 
 use windows::{
-    core::PCSTR,
     Win32::{
         Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
         System::LibraryLoader::GetModuleHandleA,
     },
+    core::PCSTR,
 };
 
 use crate::{feature::Feature, ptc::drawing::Rect};
@@ -58,6 +58,7 @@ pub trait PTCVersion {
     fn get_kb_rect() -> Rect<i32>;
     fn get_event_list() -> &'static mut EventList;
     fn is_unit_highlighted(unit_no: i32) -> bool;
+    fn get_focused_unit() -> i32;
     fn get_selected_range() -> Selection;
     fn get_unit_scroll_ofs_x() -> &'static i32;
     fn get_unit_scroll_ofs_y() -> &'static i32;
@@ -72,8 +73,8 @@ pub trait PTCVersion {
             + clock
     }
 
-    fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize;
+    fn get_fill_about_dialog()
+    -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize;
     fn center_window(hwnd: HWND);
     fn about_dlg_fn_2(hwnd: HWND);
     fn get_about_dialog_text_ids() -> (i32, i32, i32, i32);

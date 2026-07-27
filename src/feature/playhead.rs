@@ -6,7 +6,7 @@ use crate::{
     feature::scroll_hook,
     patch::Patch,
     ptc::PTCVersion,
-    winutil::{self, hiword, loword, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;

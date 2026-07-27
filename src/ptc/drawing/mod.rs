@@ -57,6 +57,8 @@ pub trait Draw {
     #[expect(unused)]
     unsafe fn fill_rect_batch(&self, rects: Vec<Rect<i32>>, color: Color);
 
+    fn set_pixels(&self, modify: impl FnOnce(&mut dyn FnMut(i32, i32, Color)));
+
     fn offset(&self, x: i32, y: i32) -> impl Draw
     where
         Self: Sized,
@@ -84,5 +86,10 @@ impl<T: Draw> Draw for OffsetDraw<'_, T> {
             .collect();
         #[expect(deprecated)]
         self.inner.fill_rect_batch(ofs_rects, color);
+    }
+
+    fn set_pixels(&self, modify: impl FnOnce(&mut dyn FnMut(i32, i32, Color))) {
+        self.inner
+            .set_pixels(|f| modify(&mut |x, y, color| f(x + self.x, y + self.y, color)));
     }
 }

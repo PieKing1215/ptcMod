@@ -4,32 +4,33 @@ use std::{
     ptr,
     string::ToString,
     sync::{
-        atomic::{AtomicU32, Ordering},
         LazyLock,
+        atomic::{AtomicU32, Ordering},
     },
 };
 
 use regex::Regex;
 use windows::{
-    core::implement,
     Win32::{
         Foundation::{HWND, POINTL},
         Graphics::Gdi::InvalidateRect,
         System::{
-            Com::{IDataObject, DVASPECT_CONTENT, FORMATETC, TYMED_HGLOBAL},
+            Com::{DVASPECT_CONTENT, FORMATETC, IDataObject, TYMED_HGLOBAL},
             Memory::{GlobalLock, GlobalUnlock},
             Ole::{
-                IDropTarget, IDropTarget_Impl, OleInitialize, RegisterDragDrop, ReleaseStgMedium,
-                RevokeDragDrop, CF_UNICODETEXT, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_NONE,
+                CF_UNICODETEXT, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_NONE, IDropTarget,
+                IDropTarget_Impl, OleInitialize, RegisterDragDrop, ReleaseStgMedium,
+                RevokeDragDrop,
             },
         },
         UI::WindowsAndMessaging::{MSG, WM_COMMAND},
     },
+    core::implement,
 };
 
 use crate::{
     ptc::PTCVersion,
-    winutil::{self, hiword, loword, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;

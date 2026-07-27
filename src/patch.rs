@@ -233,7 +233,7 @@ macro_rules! hook {
 #[allow(unused_imports)]
 pub(crate) use hook;
 use windows::Win32::System::Memory::{
-    VirtualProtect, PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS,
+    PAGE_EXECUTE_READWRITE, PAGE_PROTECTION_FLAGS, VirtualProtect,
 };
 
 #[allow(clippy::all)]

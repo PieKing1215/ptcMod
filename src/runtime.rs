@@ -1,13 +1,11 @@
 use std::{
     convert::TryInto,
-    mem::MaybeUninit,
-    sync::{mpsc::Sender, LazyLock, OnceLock},
+    sync::{LazyLock, OnceLock, mpsc::Sender},
 };
 
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, Config, TermLogger, TerminalMode};
 use windows::{
-    core::{PCSTR, PCWSTR},
     Win32::{
         Foundation::{HWND, LPARAM, LRESULT, WPARAM},
         System::{
@@ -16,11 +14,12 @@ use windows::{
         },
         UI::WindowsAndMessaging::{
             AppendMenuA, CallNextHookEx, DialogBoxParamA, DispatchMessageA, DrawMenuBar, EndDialog,
-            GetWindowThreadProcessId, MessageBoxW, PeekMessageA, SetDlgItemTextA,
-            SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, MB_ICONINFORMATION, MB_OK,
-            MENU_ITEM_FLAGS, MSG, PM_REMOVE, WH_GETMESSAGE, WM_COMMAND, WM_INITDIALOG,
+            GetWindowThreadProcessId, MB_ICONINFORMATION, MB_OK, MENU_ITEM_FLAGS, MSG, MessageBoxW,
+            PM_REMOVE, PeekMessageA, SetDlgItemTextA, SetWindowsHookExW, TranslateMessage,
+            UnhookWindowsHookEx, WH_GETMESSAGE, WM_COMMAND, WM_INITDIALOG,
         },
     },
+    core::{PCSTR, PCWSTR},
 };
 
 // TODO: maybe use https://crates.io/crates/built or something to make this more detailed (git hash, etc.)
@@ -29,7 +28,7 @@ const VERSION: Option<&str> = option_env!("CARGO_PKG_VERSION");
 use crate::{
     feature::Feature,
     ptc::PTCVersion,
-    winutil::{self, hiword, loword, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
 static M_ABOUT_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
@@ -160,11 +159,12 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 }
 
                 // we need to pump on our thread since drag/drop needs to be done on this thread
-                let mut msg = MaybeUninit::<MSG>::uninit();
-                if PeekMessageA(msg.as_mut_ptr(), None, 0, 0, PM_REMOVE).as_bool() {
+                let mut msg = MSG::default();
+                if PeekMessageA(&raw mut msg, None, 0, 0, PM_REMOVE).as_bool() {
                     did_something = true;
-                    TranslateMessage(msg.as_ptr()).unwrap();
-                    DispatchMessageA(msg.as_ptr());
+                    // TODO: this unwrap triggers with "Invalid window handle" sometimes (possibly after sleeping?)
+                    TranslateMessage(&raw const msg).unwrap();
+                    DispatchMessageA(&raw const msg);
                 }
 
                 if !did_something {

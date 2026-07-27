@@ -1,7 +1,7 @@
 use widestring::U16CString;
 use windows::{
-    core::PCWSTR,
     Win32::Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+    core::PCWSTR,
 };
 
 use crate::{
@@ -11,11 +11,11 @@ use crate::{
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{hook, hook_pre_ret_new, Patch},
+    patch::{Patch, hook, hook_pre_ret_new},
     ptc::drawing::Rect,
 };
 
-use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion, Selection};
+use super::{PTCVersion, Selection, addr, color_abgr_to_argb, color_argb_to_abgr};
 
 pub struct PTC09454;
 
@@ -256,6 +256,10 @@ impl PTCVersion for PTC09454 {
         todo!()
     }
 
+    fn get_focused_unit() -> i32 {
+        todo!()
+    }
+
     fn get_selected_range() -> Selection {
         todo!()
     }
@@ -284,8 +288,8 @@ impl PTCVersion for PTC09454 {
         todo!()
     }
 
-    fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
+    fn get_fill_about_dialog()
+    -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
     {
         unsafe extern "system" fn fill_about_dialog(
             hwnd: HWND,

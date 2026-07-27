@@ -3,15 +3,15 @@
 use std::{collections::HashMap, ffi::CString, sync::atomic::AtomicU16};
 
 use windows::{
-    core::PCSTR,
     Win32::{
         Foundation::HWND,
         UI::WindowsAndMessaging::{
-            AppendMenuA, CheckMenuItem, CreateMenu, EnableMenuItem, GetMenu, GetMenuState,
-            RemoveMenu, HMENU, MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED,
-            MF_ENABLED, MF_GRAYED, MF_POPUP, MF_UNCHECKED,
+            AppendMenuA, CheckMenuItem, CreateMenu, EnableMenuItem, GetMenu, GetMenuState, HMENU,
+            MENU_ITEM_FLAGS, MF_BYCOMMAND, MF_BYPOSITION, MF_CHECKED, MF_ENABLED, MF_GRAYED,
+            MF_POPUP, MF_UNCHECKED, RemoveMenu,
         },
     },
+    core::PCSTR,
 };
 
 use crate::ptc::PTCVersion;

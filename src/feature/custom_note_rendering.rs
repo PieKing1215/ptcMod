@@ -1,10 +1,13 @@
-use std::sync::{LazyLock, RwLock};
+use std::{
+    collections::VecDeque,
+    sync::{LazyLock, RwLock},
+};
 
 use colorsys::ColorTransform;
 use windows::Win32::{
     Foundation::RECT,
     Graphics::{
-        DirectDraw::{IDirectDrawSurface, DDBLTFAST_SRCCOLORKEY},
+        DirectDraw::{DDBLTFAST_SRCCOLORKEY, IDirectDrawSurface},
         Gdi::InvalidateRect,
     },
     UI::WindowsAndMessaging::{MSG, WM_COMMAND},
@@ -14,21 +17,22 @@ use windows_core::Interface;
 use crate::{
     patch::Patch,
     ptc::{
-        addr,
-        drawing::{color::Color, ddraw, Draw, Rect},
+        PTCVersion, addr,
+        drawing::{Draw, Rect, color::Color, ddraw},
         events::{Event, EventType},
-        PTCVersion,
     },
-    winutil::{self, hiword, loword, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
-use super::{scroll_hook, Feature};
+use super::{Feature, scroll_hook};
 
 static M_CUSTOM_RENDERING_ENABLED_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 static M_NOTE_PULSE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 static M_VOLUME_FADE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 static M_COLORED_UNITS_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 static M_SEPARATE_SURFACE_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_KEY_NOTCHES_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+static M_PORTA_PREVIEW_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 // store our own values instead since calling winapi in the draw loop would be slow
 static mut NOTE_PULSE: bool = true;
@@ -38,6 +42,8 @@ static mut COLORED_UNITS: bool = true;
 /// eg. true was better at the time I added it on windows<br/>
 /// but false is better for me on wine
 static mut USE_SEPARATE_SURFACE: bool = false;
+static mut KEY_NOTCHES: bool = true;
+static mut PORTA_PREVIEW: bool = true;
 
 // static mut DCRT: Option<&'static mut ID2D1DCRenderTarget> = None;
 static SURF: RwLock<Option<(Rect<i32>, ForceSendSync<IDirectDrawSurface>)>> = RwLock::new(None);
@@ -73,6 +79,21 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             );
             winutil::add_menu_toggle(
                 menu,
+                "Use Separate Surface",
+                *M_SEPARATE_SURFACE_ID,
+                USE_SEPARATE_SURFACE,
+                false,
+            );
+            winutil::add_menu_toggle(menu, "Key Notches", *M_KEY_NOTCHES_ID, KEY_NOTCHES, false);
+            winutil::add_menu_toggle(
+                menu,
+                "Porta View",
+                *M_PORTA_PREVIEW_ID,
+                PORTA_PREVIEW,
+                false,
+            );
+            winutil::add_menu_toggle(
+                menu,
                 "Colored Units",
                 *M_COLORED_UNITS_ID,
                 COLORED_UNITS,
@@ -80,13 +101,6 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
             );
             winutil::add_menu_toggle(menu, "Volume Fade", *M_VOLUME_FADE_ID, VOLUME_FADE, false);
             winutil::add_menu_toggle(menu, "Note Pulse", *M_NOTE_PULSE_ID, NOTE_PULSE, false);
-            winutil::add_menu_toggle(
-                menu,
-                "Use Separate Surface",
-                *M_SEPARATE_SURFACE_ID,
-                USE_SEPARATE_SURFACE,
-                false,
-            );
         }
     }
 
@@ -134,6 +148,8 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, true);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, true);
                         winutil::set_menu_enabled(msg.hwnd, *M_SEPARATE_SURFACE_ID, true);
+                        winutil::set_menu_enabled(msg.hwnd, *M_KEY_NOTCHES_ID, true);
+                        winutil::set_menu_enabled(msg.hwnd, *M_PORTA_PREVIEW_ID, true);
                     } else {
                         unsafe { self.draw_unit_notes_patch.unapply() }.unwrap();
                         unsafe { self.draw_kb_notes_patch.unapply() }.unwrap();
@@ -142,6 +158,8 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                         winutil::set_menu_enabled(msg.hwnd, *M_VOLUME_FADE_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_COLORED_UNITS_ID, false);
                         winutil::set_menu_enabled(msg.hwnd, *M_SEPARATE_SURFACE_ID, false);
+                        winutil::set_menu_enabled(msg.hwnd, *M_KEY_NOTCHES_ID, false);
+                        winutil::set_menu_enabled(msg.hwnd, *M_PORTA_PREVIEW_ID, false);
                     }
                     unsafe {
                         InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
@@ -165,6 +183,16 @@ impl<PTC: PTCVersion> Feature<PTC> for CustomNoteRendering {
                     unsafe {
                         USE_SEPARATE_SURFACE =
                             winutil::menu_toggle(msg.hwnd, *M_SEPARATE_SURFACE_ID);
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
+                    }
+                } else if low == *M_KEY_NOTCHES_ID {
+                    unsafe {
+                        KEY_NOTCHES = winutil::menu_toggle(msg.hwnd, *M_KEY_NOTCHES_ID);
+                        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
+                    }
+                } else if low == *M_PORTA_PREVIEW_ID {
+                    unsafe {
+                        PORTA_PREVIEW = winutil::menu_toggle(msg.hwnd, *M_PORTA_PREVIEW_ID);
                         InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
                     }
                 } else if low == *scroll_hook::M_SCROLL_HOOK_ID {
@@ -289,8 +317,8 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     let mut surf = SURF.try_write().unwrap();
     if let Some((surf_size, _surf)) = surf.as_ref() {
         if *surf_size != unit_area {
-            println!("unit area resized");
-            let _ = real_draw.DeleteAttachedSurface(0, &surf.take().unwrap().1 .0);
+            log::debug!("Unit area resized");
+            let _ = real_draw.DeleteAttachedSurface(0, &surf.take().unwrap().1.0);
             *surf = Some((
                 unit_area,
                 ForceSendSync(ddraw::create_surface(
@@ -301,7 +329,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
             ));
         }
     } else {
-        println!("creating unit area surface");
+        log::debug!("Creating unit area surface");
         *surf = Some((
             unit_area,
             ForceSendSync(ddraw::create_surface(
@@ -313,7 +341,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
     }
 
     let draw = if USE_SEPARATE_SURFACE {
-        &surf.as_mut().unwrap().1 .0
+        &surf.as_mut().unwrap().1.0
     } else {
         real_draw
     };
@@ -330,7 +358,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
         },
     );
 
-    let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
+    let colors = PTC::get_base_note_colors_argb().map(|c| Color::from_argb(c).with_a(1.0));
 
     let highlighted = (0..unit_num)
         .into_iter()
@@ -695,22 +723,24 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
                 }
             },
             EventType::Key => {
-                let fade_color = if dim {
-                    Color::from_argb(0xff200040)
-                } else {
-                    Color::from_argb(0xff400070)
-                };
-
-                let x =
-                    (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x + bounds.left;
-                if x > bounds.left - 1 && x < bounds.right {
-                    if do_batching {
-                        batch_a.push((Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color));
-                        batch_a.push((Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color));
+                if KEY_NOTCHES {
+                    let fade_color = if dim {
+                        Color::from_argb(0xff200040)
                     } else {
-                        draw.fill_rect(&Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color);
-                        draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
-                        count += 2;
+                        Color::from_argb(0xff400070)
+                    };
+
+                    let x = (eve.clock * (*meas_width as i32) / beat_clock as i32) - ofs_x
+                        + bounds.left;
+                    if x > bounds.left - 1 && x < bounds.right {
+                        if do_batching {
+                            batch_a.push((Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color));
+                            batch_a.push((Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color));
+                        } else {
+                            draw.fill_rect(&Rect::<i32>::new(x, y + 1, x + 1, y + 2), fade_color);
+                            draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
+                            count += 2;
+                        }
                     }
                 }
             },
@@ -772,7 +802,7 @@ pub(crate) unsafe fn draw_unit_notes<PTC: PTCVersion>() {
             .BltFast(
                 (*dst_rect).left as u32,
                 (*dst_rect).top as u32,
-                &surf.as_mut().unwrap().1 .0,
+                &surf.as_mut().unwrap().1.0,
                 &raw mut src_rect,
                 DDBLTFAST_SRCCOLORKEY,
             )
@@ -964,7 +994,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     let mut surf = SURF_KB.try_write().unwrap();
     if let Some((surf_size, _surf)) = surf.as_ref() {
         if *surf_size != unit_area {
-            let _ = real_draw.DeleteAttachedSurface(0, &surf.take().unwrap().1 .0);
+            let _ = real_draw.DeleteAttachedSurface(0, &surf.take().unwrap().1.0);
             *surf = Some((
                 unit_area,
                 ForceSendSync(ddraw::create_surface(
@@ -986,10 +1016,11 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
     }
 
     let draw = if USE_SEPARATE_SURFACE {
-        &surf.as_mut().unwrap().1 .0
+        &surf.as_mut().unwrap().1.0
     } else {
         real_draw
     };
+
     let draw = draw.offset(
         if USE_SEPARATE_SURFACE {
             0
@@ -1003,7 +1034,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         },
     );
 
-    let colors = PTC::get_base_note_colors_argb().map(Color::from_argb);
+    let colors = PTC::get_base_note_colors_argb().map(|c| Color::from_argb(c).with_a(1.0));
 
     let highlighted = (0..unit_num)
         .into_iter()
@@ -1027,6 +1058,10 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         .into_iter()
         .map(|_u| (0x6C00 - 0x4500) * unit_height / 0x100 + unit_height / 2)
         .collect::<Vec<_>>();
+
+    let mut last_key_eves = (0..unit_num).into_iter().map(|_u| None).collect::<Vec<_>>();
+
+    let mut last_porta_eves = (0..unit_num).into_iter().map(|_u| None).collect::<Vec<_>>();
 
     let mut eve_raw = events_list.start;
     while !eve_raw.is_null() {
@@ -1256,11 +1291,17 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                     }
                 }
 
+                if !PTC::is_playing() && u != PTC::get_focused_unit() {
+                    color = color.with_a(color.a_f32() * 0.25);
+                }
+
                 if do_batching {
                     batch_a.push((note_rect, color));
                 } else {
                     let mut cur_eve: &Event = eve;
                     let mut next_key = cur_y[u as usize];
+                    let mut key_events = VecDeque::new();
+                    let mut rects = vec![];
                     #[allow(clippy::while_let_loop)]
                     loop {
                         if let Some(next_eve_key) = get_next_event(
@@ -1286,12 +1327,13 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                                 (x2).min(bounds.right),
                                 (y + 4).min(bounds.bottom),
                             );
-                            draw.fill_rect(&note_rect, color);
+                            rects.push(note_rect);
 
                             next_key = (0x6C00 - 0x4500 - (next_eve_key.value - 0x6000)) / 0x100
                                 * unit_height
                                 + unit_height / 2;
                             cur_eve = next_eve_key;
+                            key_events.push_back(next_eve_key);
                         } else {
                             let x = (cur_eve.clock * (*meas_width as i32) / beat_clock as i32)
                                 - ofs_x
@@ -1309,13 +1351,159 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                                 (x2).min(bounds.right),
                                 (y + 4).min(bounds.bottom),
                             );
-                            draw.fill_rect(&note_rect, color);
+                            rects.push(note_rect);
                             break;
                         }
                     }
+
+                    if PORTA_PREVIEW {
+                        draw.set_pixels(|set_pixel| {
+                            let on_eve = &eve;
+
+                            let initial_key_eve: Option<&Event> = last_key_eves[u as usize];
+                            let initial_porta_eve: Option<&Event> = last_porta_eves[u as usize];
+
+                            let mut last_key = initial_key_eve.map_or(0x6000, |ke| ke.value);
+                            let mut tgt_key_clock = initial_key_eve.map_or(0, |ke| ke.clock);
+                            let mut tgt_key = last_key;
+
+                            let mut last_porta = initial_porta_eve.map_or(0, |pe| pe.value);
+
+                            let mut next_porta_eve = get_next_event(
+                                on_eve.clock,
+                                on_eve.clock + on_eve.value,
+                                EventType::Portament,
+                                u,
+                                initial_porta_eve.map_or(on_eve.next, |pe| pe.next),
+                            );
+
+                            for px in x..note_rect.right {
+                                let clock = (px - bounds.left + ofs_x) * beat_clock as i32
+                                    / (*meas_width as i32);
+
+                                loop {
+                                    let mut did_something = false;
+
+                                    let mut process_events = vec![];
+
+                                    if let Some(ke) =
+                                        key_events.pop_front_if(|ke| clock >= ke.clock)
+                                    {
+                                        process_events.push(ke);
+                                    }
+
+                                    if let Some(pe) = next_porta_eve
+                                        && clock >= pe.clock
+                                    {
+                                        process_events.push(pe);
+                                    }
+
+                                    // since we step 1 pixel at a time (which is >1 clock tick) make sure we don't process events out of order
+                                    process_events.sort_by_key(|ev| ev.clock);
+
+                                    for ev in process_events {
+                                        match ev.kind {
+                                            EventType::Key => {
+                                                let porta_thru = if last_porta > 0 {
+                                                    ((ev.clock - tgt_key_clock) as f32
+                                                        / last_porta as f32)
+                                                        .clamp(0.0, 1.0)
+                                                } else {
+                                                    1.0
+                                                };
+                                                let key = (last_key as f32
+                                                    + (tgt_key - last_key) as f32 * porta_thru)
+                                                    as i32;
+                                                last_key = key;
+
+                                                tgt_key = ev.value;
+                                                tgt_key_clock = ev.clock;
+                                                did_something = true;
+                                            },
+                                            EventType::Portament => {
+                                                // changing porta after the current slide ends updates the starting key
+                                                if ev.clock != tgt_key_clock
+                                                    && clock >= tgt_key_clock + last_porta
+                                                {
+                                                    last_key = tgt_key;
+                                                } else {
+                                                    // when porta changes *mid* slide it doesn't recalculate the starting key (unless you put a key event)
+                                                    // causes a discontinuity but is accurate
+                                                }
+                                                last_porta = ev.value;
+                                                next_porta_eve = get_next_event(
+                                                    on_eve.clock,
+                                                    on_eve.clock + on_eve.value,
+                                                    EventType::Portament,
+                                                    u,
+                                                    ev.next,
+                                                );
+                                                did_something = true;
+                                            },
+                                            _ => unimplemented!(),
+                                        }
+                                    }
+                                    if !did_something {
+                                        break;
+                                    }
+                                }
+
+                                let porta_thru = if last_porta > 0 {
+                                    ((clock - tgt_key_clock) as f32 / last_porta as f32)
+                                        .clamp(0.0, 1.0)
+                                } else {
+                                    1.0
+                                };
+                                let key = (last_key as f32
+                                    + (tgt_key - last_key) as f32 * porta_thru)
+                                    as i32;
+
+                                let key_y = (0x6C00 - 0x4500 - (key - 0x6000)) * unit_height
+                                    / 0x100
+                                    + unit_height / 2;
+
+                                let y = bounds.top + key_y - ofs_y;
+                                for py in (y - 4)..(y + 4) {
+                                    if px < bounds.left
+                                        || px >= bounds.right
+                                        || py < bounds.top
+                                        || py >= bounds.bottom
+                                    {
+                                        continue;
+                                    }
+                                    let mut color = color;
+
+                                    if let Some(hl) = highlight_rect
+                                        && px >= hl.left
+                                        && px < hl.right
+                                    {
+                                        color = highlight_color;
+                                    }
+
+                                    set_pixel(
+                                        px,
+                                        py,
+                                        color.with_a(
+                                            color.a_f32()
+                                                * if PTC::is_playing() { 1.0 } else { 0.5 },
+                                        ),
+                                    );
+                                }
+                            }
+                        });
+
+                        color = color
+                            .with_a(color.a_f32() * if PTC::is_playing() { 0.25 } else { 0.75 });
+                    }
+
+                    for rect in rects {
+                        unsafe { draw.fill_rect(&rect, color) };
+                    }
                 }
 
-                if let Some(hl) = highlight_rect {
+                if let Some(hl) = highlight_rect
+                    && !PORTA_PREVIEW
+                {
                     if do_batching {
                         batch_a.push((hl, highlight_color));
                     } else {
@@ -1442,6 +1630,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
             EventType::Key => {
                 cur_y[u as usize] = (0x6C00 - 0x4500 - (eve.value - 0x6000)) / 0x100 * unit_height
                     + unit_height / 2;
+                last_key_eves[u as usize] = Some(eve);
 
                 // let fade_color = if dim {
                 //     Color::from_argb(0xff200040)
@@ -1460,6 +1649,9 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
                 //         draw.fill_rect(&Rect::<i32>::new(x, y - 2, x + 1, y - 1), fade_color);
                 //     }
                 // }
+            },
+            EventType::Portament => {
+                last_porta_eves[u as usize] = Some(eve);
             },
             _ => {
                 // let x =
@@ -1495,7 +1687,7 @@ pub(crate) unsafe fn draw_kb_notes<PTC: PTCVersion>() {
         real_draw
             .Blt(
                 unit_area.as_lprect(),
-                &surf.as_mut().unwrap().1 .0,
+                &surf.as_mut().unwrap().1.0,
                 std::ptr::null_mut(),
                 0x00010000 | 0x1000000,
                 ddbltfx.as_mut_ptr().cast(),

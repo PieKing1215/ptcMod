@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use windows::Win32::{
     Foundation::{HWND, POINT, RECT},
     Graphics::Gdi::MapWindowPoints,
-    UI::WindowsAndMessaging::{GetDlgItem, GetWindowRect, SetWindowPos, MSG, SWP_NOZORDER},
+    UI::WindowsAndMessaging::{GetDlgItem, GetWindowRect, MSG, SWP_NOZORDER, SetWindowPos},
 };
 
 use crate::{patch::Patch, ptc::PTCVersion, winutil::Menus};

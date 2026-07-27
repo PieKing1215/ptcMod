@@ -1,4 +1,9 @@
-use std::{sync::LazyLock, time::Instant};
+use std::{
+    num::NonZeroU16,
+    sync::LazyLock,
+    thread,
+    time::{Duration, Instant},
+};
 
 use windows::Win32::{
     Graphics::Gdi::InvalidateRect,
@@ -8,7 +13,7 @@ use windows::Win32::{
 use crate::{
     patch::Patch,
     ptc::PTCVersion,
-    winutil::{self, hiword, loword, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;
@@ -17,11 +22,13 @@ pub(crate) static M_SCROLL_HOOK_ID: LazyLock<u16> = LazyLock::new(winutil::next_
 pub(crate) static M_SMOOTH_SCROLL_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub(crate) static mut ENABLED: bool = false;
+pub(crate) static mut FPS_CAP: Option<NonZeroU16> = None; //NonZeroU16::new(144);
 
 pub(crate) static mut LAST_PLAY_POS: u32 = 0;
 pub(crate) static mut LAST_PLAY_POS_TIME: Option<Instant> = None;
 pub(crate) static mut LAST_SCROLL: i32 = 0;
 pub(crate) static mut LAST_PLAYHEAD_POS: i32 = 0;
+pub(crate) static mut LAST_TICK_TIME: Option<Instant> = None;
 
 pub struct Scroll {
     patch: Vec<Patch>,
@@ -100,6 +107,18 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
 }
 
 pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
+    if let (Some(i), Some(cap)) = (LAST_TICK_TIME, FPS_CAP) {
+        let elapsed = i.elapsed();
+        if elapsed.as_secs_f32() < 1.0 / (cap.get() as f32) {
+            let dur = Duration::from_secs_f32(1.0 / (cap.get() as f32))
+                .checked_sub(elapsed)
+                .unwrap();
+            log::debug!("sleep {dur:?}");
+            thread::sleep(dur);
+        }
+    }
+    LAST_TICK_TIME = Some(Instant::now());
+
     if PTC::is_playing() && *PTC::get_tab() > 0 {
         {
             let smooth = winutil::get_menu_checked(*PTC::get_hwnd(), *M_SMOOTH_SCROLL_ID);

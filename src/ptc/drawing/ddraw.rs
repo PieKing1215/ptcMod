@@ -1,12 +1,30 @@
 use std::mem::ManuallyDrop;
 
-use windows::Win32::Graphics::DirectDraw::{IDirectDrawSurface, DDBLTBATCH};
+use windows::Win32::{
+    Foundation::HANDLE,
+    Graphics::DirectDraw::{
+        DDBLT_COLORFILL, DDBLT_DDFX, DDBLT_WAIT, DDBLTBATCH, DDLOCK_WAIT, DDSURFACEDESC,
+        IDirectDrawSurface,
+    },
+};
 use windows_core::Interface;
 
-use super::{color::Color, Draw, Rect};
+use super::{Draw, Rect, color::Color};
 
 impl Draw for IDirectDrawSurface {
     unsafe fn fill_rect(&self, rect: &Rect<i32>, color: Color) {
+        if color.a != u8::MAX {
+            // ddraw can't do alpha blending so need to do it manually
+            self.set_pixels(|set_pixel| {
+                for x in rect.left..rect.right {
+                    for y in rect.top..rect.bottom {
+                        set_pixel(x, y, color);
+                    }
+                }
+            });
+            return;
+        }
+
         let mut ddbltfx = [0_u32; 25];
         ddbltfx[0] = 100;
         ddbltfx[20] = color.into_argb();
@@ -15,7 +33,7 @@ impl Draw for IDirectDrawSurface {
             rect.as_lprect(),
             None,
             std::ptr::null_mut(),
-            0x1000400,
+            (DDBLT_COLORFILL | DDBLT_WAIT | DDBLT_DDFX) as _,
             ddbltfx.as_mut_ptr().cast(),
         );
     }
@@ -39,6 +57,45 @@ impl Draw for IDirectDrawSurface {
             .collect();
 
         let _ = self.BltBatch(batches.as_mut_ptr(), batches.len() as u32, 0);
+    }
+
+    fn set_pixels(&self, modify: impl FnOnce(&mut dyn FnMut(i32, i32, Color))) {
+        unsafe {
+            let mut desc = DDSURFACEDESC {
+                dwSize: std::mem::size_of::<DDSURFACEDESC>() as u32,
+                ..Default::default()
+            };
+
+            self.Lock(
+                std::ptr::null_mut(),
+                &raw mut desc,
+                DDLOCK_WAIT as _,
+                HANDLE(std::ptr::null_mut()),
+            )
+            .unwrap();
+
+            let pf = &desc.ddpfPixelFormat;
+            assert_eq!(pf.Anonymous1.dwRGBBitCount, 32);
+            assert_eq!(pf.Anonymous2.dwRBitMask, 0x00FF0000);
+            assert_eq!(pf.Anonymous3.dwGBitMask, 0x0000FF00);
+            assert_eq!(pf.Anonymous4.dwBBitMask, 0x000000FF);
+            assert_eq!(pf.Anonymous5.dwRGBAlphaBitMask, 0x00000000);
+
+            let pixels = desc.lpSurface.cast::<u8>();
+            let pitch = desc.Anonymous1.lPitch as isize;
+
+            let mut set_pixel = |x, y, color: Color| {
+                let pixel = pixels
+                    .offset(y as isize * pitch + x as isize * 4)
+                    .cast::<u32>();
+                let dst = Color::from_argb(*pixel);
+                *pixel = dst.blend(color, color.a_f32()).with_a(u8::MAX).into_argb();
+            };
+
+            modify(&mut set_pixel);
+
+            self.Unlock(std::ptr::null_mut()).unwrap();
+        }
     }
 }
 

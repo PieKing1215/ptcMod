@@ -1,12 +1,13 @@
 use std::{ffi::CString, os::raw::c_void, slice};
 
 use windows::{
-    core::PCSTR,
     Win32::Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+    core::PCSTR,
 };
 
 use crate::{
     feature::{
+        Feature,
         custom_note_rendering::{self, CustomNoteRendering},
         dialog_input_width::{self, DialogInputWidth},
         drag_and_drop::DragAndDrop,
@@ -15,16 +16,14 @@ use crate::{
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
         volume_muliply::VolumeAdjuster,
-        Feature,
     },
-    patch::{hook_post_ret_new, hook_post_ret_old, hook_pre_ret_new, replace, Patch},
+    patch::{Patch, hook_post_ret_new, hook_post_ret_old, hook_pre_ret_new, replace},
     ptc::drawing::Rect,
 };
 
 use super::{
-    addr,
+    PTCVersion, Selection, addr,
     events::{Event, EventList},
-    PTCVersion, Selection,
 };
 
 pub struct PTC0925;
@@ -306,6 +305,14 @@ impl PTCVersion for PTC0925 {
         }
     }
 
+    fn get_focused_unit() -> i32 {
+        unsafe {
+            let get_focused_unit: unsafe extern "stdcall" fn() -> i32 =
+                std::mem::transmute(addr(0x70b0) as *const ());
+            (get_focused_unit)()
+        }
+    }
+
     fn get_selected_range() -> Selection {
         unsafe {
             let get_selected_range: unsafe extern "cdecl" fn(
@@ -386,8 +393,8 @@ impl PTCVersion for PTC0925 {
         }
     }
 
-    fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
+    fn get_fill_about_dialog()
+    -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
     {
         unsafe extern "system" fn fill_about_dialog(
             hwnd: HWND,
