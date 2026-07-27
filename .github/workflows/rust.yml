@@ -1,6 +1,7 @@
 name: Rust
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -11,11 +12,10 @@ env:
 
 jobs:
   build:
-
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Setup
       run: |
         rustup target add i686-pc-windows-gnu
@@ -27,18 +27,18 @@ jobs:
     - name: Run tests
       run: cargo test --release --verbose
 
-    - name: Compress ptc-mod.exe with UPX
-      uses: svenstaro/upx-action@v2
-      with:
-        file: ./target/i686-pc-windows-gnu/release/ptc-mod.exe
+    # - name: Compress ptc-mod.exe with UPX
+    #   uses: svenstaro/upx-action@v2
+    #   with:
+    #     file: ./target/i686-pc-windows-gnu/release/ptc-mod.exe
 
-    - name: Compress ptc_mod.dll with UPX
-      uses: svenstaro/upx-action@v2
-      with:
-        file: ./target/i686-pc-windows-gnu/release/ptc_mod.dll
+    # - name: Compress ptc_mod.dll with UPX
+    #   uses: svenstaro/upx-action@v2
+    #   with:
+    #     file: ./target/i686-pc-windows-gnu/release/ptc_mod.dll
 
     - name: Upload Artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: ptcMod
         path: |
