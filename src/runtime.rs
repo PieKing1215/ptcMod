@@ -81,13 +81,13 @@ impl<PTC: PTCVersion> Runtime<PTC> {
         unsafe {
             let hwnd = PTC::get_hwnd();
 
-            let base: usize = GetModuleHandleA(PCSTR(
+            let base = GetModuleHandleA(PCSTR(
                 "ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr(),
             ))
             .unwrap()
-            .0 as usize;
+            .0;
 
-            log::debug!("Base address (allocation address) = {base}");
+            log::debug!("Base address (allocation address) = {base:x?}");
 
             let (v1, v2, v3, v4) = PTC::get_version();
             log::info!("ptc version = {v1}.{v2}.{v3}.{v4}");
