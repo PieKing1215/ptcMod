@@ -1,20 +1,30 @@
-use std::ffi::CString;
+use std::{ffi::CString, os::raw::c_void, slice};
+
+use windows::{
+    Win32::Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+    core::PCSTR,
+};
 
 use crate::{
     feature::{
+        Feature,
         custom_note_rendering::{self, CustomNoteRendering},
+        dialog_input_width::{self, DialogInputWidth},
         drag_and_drop::DragAndDrop,
         fps_display_fix::FPSDisplayFix,
         fps_unlock::FPSUnlock,
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
-        Feature,
+        volume_muliply::VolumeAdjuster,
     },
-    patch::{hook, hook_post_ret_new, hook_pre_ret_new, Patch},
+    patch::{Patch, hook_post_ret_new, hook_post_ret_old, hook_pre_ret_new, replace},
+    ptc::drawing::Rect,
 };
-use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
 
-use super::{addr, PTCVersion};
+use super::{
+    PTCVersion, Selection, addr,
+    events::{Event, EventList},
+};
 
 pub struct PTC0925;
 
@@ -73,41 +83,60 @@ impl PTCVersion for PTC0925 {
 
         // custom note rendering
 
-        let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
-        let note_rect_hook_patch = hook!(
-            0x1469f,
-            0x1c0e0,
-            "cdecl",
-            fn(rect: *const i32, ebp: u32),
-            |_old_fn, rect, ebp| {
-                let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
-                let unit = *((ebp - 0x80) as *mut u32);
-                custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, unit, not_focused);
-            }
+        // let note_rect_push_ebp = Patch::new(0x1469a, vec![0x52], vec![0x55]).unwrap();
+        // let note_rect_hook_patch = hook!(
+        //     0x1469f,
+        //     0x1c0e0,
+        //     "cdecl",
+        //     fn(rect: *const i32, ebp: u32),
+        //     |_old_fn, rect, ebp| {
+        //         let not_focused = *((ebp - 0x7c) as *mut u32) != 0;
+        //         let unit = *((ebp - 0x80) as *mut u32);
+        //         custom_note_rendering::draw_unit_note_rect::<PTC0925>(rect, unit, not_focused);
+        //     }
+        // );
+
+        // // first set here changes the spritesheet to empty, second NOPs the draw_image call completely
+        // // let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
+        // // let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
+        // let note_disable_left_edge = Patch::new(
+        //     0x146ca,
+        //     vec![0xe8, 0xa1, 0x77, 0x00, 0x00],
+        //     vec![0x90, 0x90, 0x90, 0x90, 0x90],
+        // )
+        // .unwrap();
+        // let note_disable_right_edge = Patch::new(
+        //     0x146f9,
+        //     vec![0xe8, 0x72, 0x77, 0x00, 0x00],
+        //     vec![0x90, 0x90, 0x90, 0x90, 0x90],
+        // )
+        // .unwrap();
+
+        // let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
+        //     note_rect_push_ebp,
+        //     note_rect_hook_patch,
+        //     note_disable_left_edge,
+        //     note_disable_right_edge,
+        // );
+
+        let draw_unit_notes = replace!(
+            0x166bb,
+            0x14480,
+            "stdcall",
+            fn(),
+            custom_note_rendering::draw_unit_notes::<PTC0925>
         );
 
-        // first set here changes the spritesheet to empty, second NOPs the draw_image call completely
-        // let note_disable_left_edge = Patch::new(0x146b8, vec![0x03], vec![0x00]).unwrap();
-        // let note_disable_right_edge = Patch::new(0x146e9, vec![0x03], vec![0x00]).unwrap();
-        let note_disable_left_edge = Patch::new(
-            0x146ca,
-            vec![0xe8, 0xa1, 0x77, 0x00, 0x00],
-            vec![0x90, 0x90, 0x90, 0x90, 0x90],
-        )
-        .unwrap();
-        let note_disable_right_edge = Patch::new(
-            0x146f9,
-            vec![0xe8, 0x72, 0x77, 0x00, 0x00],
-            vec![0x90, 0x90, 0x90, 0x90, 0x90],
-        )
-        .unwrap();
-
-        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
-            note_rect_push_ebp,
-            note_rect_hook_patch,
-            note_disable_left_edge,
-            note_disable_right_edge,
+        let draw_kb_notes = replace!(
+            0x16644,
+            0xf370,
+            "stdcall",
+            fn(),
+            custom_note_rendering::draw_kb_notes::<PTC0925>
         );
+
+        let f_custom_note_rendering =
+            CustomNoteRendering::new::<Self>(draw_unit_notes, draw_kb_notes);
 
         // playhead
 
@@ -134,6 +163,18 @@ impl PTCVersion for PTC0925 {
         let f_fps_display_fix =
             FPSDisplayFix::new::<Self>(digit_patch, number_x_patch, label_x_patch);
 
+        // dialog input width
+
+        let dialog_input_setup_patch = hook_post_ret_old!(
+            0x192a1,
+            0x190b0,
+            "cdecl",
+            fn(h_dlg: *mut c_void),
+            dialog_input_width::modify_dialog
+        );
+
+        let f_dialog_input_width = DialogInputWidth::new::<Self>(dialog_input_setup_patch);
+
         vec![
             Box::new(FPSUnlock::new::<Self>()),
             Box::new(f_scroll_hook),
@@ -141,6 +182,8 @@ impl PTCVersion for PTC0925 {
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
             Box::new(f_fps_display_fix),
+            Box::new(f_dialog_input_width),
+            Box::new(VolumeAdjuster::new()),
         ]
     }
 
@@ -148,7 +191,7 @@ impl PTCVersion for PTC0925 {
         unsafe { &mut *(addr(0xDD4440 - 0xd30000) as *mut HWND) }
     }
 
-    fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {
+    fn get_hinstance() -> &'static mut HINSTANCE {
         unsafe { &mut *(addr(0x00dd431c - 0xd30000) as *mut HINSTANCE) }
     }
 
@@ -194,22 +237,21 @@ impl PTCVersion for PTC0925 {
 
     fn get_beat_num() -> &'static mut u32 {
         unsafe {
-            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x98) as *mut usize) + 0x10)
+            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize))
                 as *mut u32)
         }
     }
 
     fn get_tempo() -> &'static mut f32 {
         unsafe {
-            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x98) as *mut usize)
-                + 0x10
-                + 0x4) as *mut f32)
+            &mut *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize) + 0x4)
+                as *mut f32)
         }
     }
 
     fn get_beat_clock() -> u32 {
         unsafe {
-            *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x98) as *mut usize) + 0x10 + 0x8)
+            *((*((*(addr(0xdd4430 - 0xd30000) as *mut usize) + 0x9c) as *mut usize) + 0x8)
                 as *mut u32)
         }
     }
@@ -242,20 +284,125 @@ impl PTCVersion for PTC0925 {
         .max(0)
     }
 
-    fn get_unit_rect() -> [i32; 4] {
-        unsafe { *(addr(0xa693c) as *const [i32; 4]) }
+    fn get_unit_rect() -> Rect<i32> {
+        // unsafe { *(addr(0xa693c) as *const [i32; 4]) }
+        unsafe { *(addr(0xa6cbc) as *const Rect<i32>) }
     }
 
-    fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize
+    fn get_kb_rect() -> Rect<i32> {
+        unsafe { *(addr(0xa6a68) as *const Rect<i32>) }
+    }
+
+    fn get_event_list() -> &'static mut super::events::EventList {
+        unsafe { &mut **((*(addr(0xa4430) as *mut usize) + 160) as *mut *mut EventList) }
+    }
+
+    fn is_unit_highlighted(unit_no: i32) -> bool {
+        unsafe {
+            let is_unit_highlighted: unsafe extern "cdecl" fn(unit: libc::c_int) -> bool =
+                std::mem::transmute(addr(0x71a0) as *const ());
+            (is_unit_highlighted)(unit_no)
+        }
+    }
+
+    fn get_focused_unit() -> i32 {
+        unsafe {
+            let get_focused_unit: unsafe extern "stdcall" fn() -> i32 =
+                std::mem::transmute(addr(0x70b0) as *const ());
+            (get_focused_unit)()
+        }
+    }
+
+    fn get_selected_range() -> Selection {
+        unsafe {
+            let get_selected_range: unsafe extern "cdecl" fn(
+                meas_min: *mut i32,
+                meas_max: *mut i32,
+                beat_min: *mut i32,
+                beat_max: *mut i32,
+                clock_min: *mut i32,
+                clock_max: *mut i32,
+            ) -> bool = std::mem::transmute(addr(0x12940) as *const ());
+
+            let mut meas_min = 0;
+            let mut meas_max = 0;
+            let mut beat_min = 0;
+            let mut beat_max = 0;
+            let mut clock_min = 0;
+            let mut clock_max = 0;
+
+            (get_selected_range)(
+                &raw mut meas_min,
+                &raw mut beat_min,
+                &raw mut clock_min,
+                &raw mut meas_max,
+                &raw mut beat_max,
+                &raw mut clock_max,
+            );
+
+            Selection {
+                meas_min,
+                meas_max,
+                beat_min,
+                beat_max,
+                clock_min,
+                clock_max,
+            }
+        }
+    }
+
+    fn get_unit_scroll_ofs_x() -> &'static i32 {
+        unsafe { &*(addr(0xa6d70 + 0x14) as *mut i32) }
+    }
+
+    fn get_unit_scroll_ofs_y() -> &'static i32 {
+        unsafe { &*(addr(0xa6ec0 + 0x14) as *mut i32) }
+    }
+
+    fn get_kb_scroll_ofs_x() -> &'static i32 {
+        unsafe { &*(addr(0xa6d70 + 0x14) as *mut i32) }
+    }
+
+    fn get_kb_scroll_ofs_y() -> &'static i32 {
+        unsafe { &*(addr(0xa6f30 + 0x14) as *mut i32) }
+    }
+
+    fn get_unit_num() -> i32 {
+        unsafe { *((*(addr(0xa4430) as *mut usize) + 60) as *mut i32) }
+    }
+
+    fn get_events_for_unit(unit_no: i32) -> &'static [super::events::Event] {
+        unsafe {
+            // reset lock
+            *(addr(0xa696c) as *mut bool) = false;
+
+            let mut raw_events = std::ptr::null_mut();
+            // log::debug!("{unit_no} {raw_events:?}");
+            let fill_events_for_unit: unsafe extern "cdecl" fn(
+                unit_no: u32,
+                events_ptr: *mut *mut Event,
+            ) -> i32 = std::mem::transmute(addr(0x8cd0) as *const ());
+            let count = (fill_events_for_unit)(unit_no as u32, &raw mut raw_events);
+
+            // log::debug!("{count} {raw_events:?}");
+
+            // reset lock again
+            *(addr(0xa696c) as *mut bool) = false;
+
+            slice::from_raw_parts(raw_events, count as usize)
+        }
+    }
+
+    fn get_fill_about_dialog()
+    -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
     {
         unsafe extern "system" fn fill_about_dialog(
             hwnd: HWND,
             msg: u32,
-            w_param: usize,
-            l_param: isize,
+            w_param: WPARAM,
+            l_param: LPARAM,
         ) -> isize {
-            crate::runtime::fill_about_dialog::<PTC0925>(hwnd, msg, w_param, l_param)
+            unsafe { crate::runtime::fill_about_dialog::<PTC0925>(hwnd, msg, w_param, l_param) }
         }
         fill_about_dialog
     }
@@ -304,6 +451,7 @@ impl PTCVersion for PTC0925 {
     }
 
     fn load_file_no_history(path: std::path::PathBuf) {
+        #[expect(clippy::unnecessary_debug_formatting, reason = "false positive")]
         unsafe {
             log::debug!("load_file_no_history({path:?})");
 
@@ -336,7 +484,7 @@ impl PTCVersion for PTC0925 {
                 unk: u8,
             ) -> u8 = std::mem::transmute(addr(0x25ef0) as *const ());
 
-            let ptr_2: *mut *mut libc::FILE = &mut file;
+            let ptr_2: *mut *mut libc::FILE = &raw mut file;
 
             log::debug!("read_file(...)");
             let r = (read_file)(*(addr(0xa4430) as *mut usize) as *mut _, ptr_2.cast(), 0);
@@ -373,9 +521,9 @@ impl PTCVersion for PTC0925 {
             (clear_save_path)(addr(0xa3598) as *mut _);
 
             log::debug!("set_window_title_path({cstr:?})");
-            let set_window_title_path: unsafe extern "cdecl" fn(path: winapi::um::winnt::LPCSTR) =
+            let set_window_title_path: unsafe extern "cdecl" fn(path: PCSTR) =
                 std::mem::transmute(addr(0x3ad0) as *const ());
-            (set_window_title_path)(cstr.as_ptr());
+            (set_window_title_path)(PCSTR(cstr.as_ptr().cast()));
 
             log::debug!("done.");
 
@@ -392,6 +540,14 @@ impl PTCVersion for PTC0925 {
             // let mut b = false;
             // let _r = (read_file2)(*Self::get_hwnd(), cstr.as_ptr(), &mut a, &mut b);
             // log::debug!("read_file2 => {r}");
+        }
+    }
+
+    fn volume_adjust_fill_selected_units(hwnd: HWND) -> bool {
+        unsafe {
+            let fill_selected_units: unsafe extern "cdecl" fn(hwnd: HWND) -> bool =
+                std::mem::transmute(addr(0x190b0) as *const ());
+            (fill_selected_units)(hwnd)
         }
     }
 }

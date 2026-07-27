@@ -1,3 +1,5 @@
+use windows::Win32::UI::WindowsAndMessaging::MSG;
+
 use crate::{patch::Patch, ptc::PTCVersion, winutil::Menus};
 
 use super::Feature;
@@ -23,7 +25,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.apply() {
-                    log::warn!("fps display patch: {:?}", e);
+                    log::warn!("fps display patch: {e:?}");
                 }
             }
         }
@@ -33,11 +35,11 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSDisplayFix {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("fps display patch: {:?}", e);
+                    log::warn!("fps display patch: {e:?}");
                 }
             }
         }
     }
 
-    fn win_msg(&mut self, _msg: &winapi::um::winuser::MSG) {}
+    fn win_msg(&mut self, _msg: &MSG) {}
 }

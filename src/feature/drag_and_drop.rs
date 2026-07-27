@@ -1,39 +1,66 @@
-use std::{ffi::CString, fs::File, intrinsics::transmute, path::PathBuf, ptr, string::ToString};
+use std::{
+    fs::File,
+    path::PathBuf,
+    ptr,
+    string::ToString,
+    sync::{
+        LazyLock,
+        atomic::{AtomicU32, Ordering},
+    },
+};
 
 use regex::Regex;
-use winapi::{
-    shared::{
-        guiddef::REFIID,
-        minwindef::{DWORD, ULONG},
-        windef::POINTL,
-        wtypes::DVASPECT_CONTENT,
+use windows::{
+    Win32::{
+        Foundation::{HWND, POINTL},
+        Graphics::Gdi::InvalidateRect,
+        System::{
+            Com::{DVASPECT_CONTENT, FORMATETC, IDataObject, TYMED_HGLOBAL},
+            Memory::{GlobalLock, GlobalUnlock},
+            Ole::{
+                CF_UNICODETEXT, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_NONE, IDropTarget,
+                IDropTarget_Impl, OleInitialize, RegisterDragDrop, ReleaseStgMedium,
+                RevokeDragDrop,
+            },
+        },
+        UI::WindowsAndMessaging::{MSG, WM_COMMAND},
     },
-    um::{
-        objidl::{IDataObject, FORMATETC, TYMED_HGLOBAL},
-        ole2::{OleInitialize, RegisterDragDrop, RevokeDragDrop},
-        oleidl::{IDropTarget, IDropTargetVtbl, DROPEFFECT_COPY, DROPEFFECT_NONE},
-        unknwnbase::{IUnknown, IUnknownVtbl},
-        winnt::HRESULT,
-        winuser::{self, CF_TEXT},
-    },
+    core::implement,
 };
 
 use crate::{
     ptc::PTCVersion,
-    winutil::{self, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_DRAGDROP_ID: u16 = winutil::next_id();
+static M_DRAGDROP_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
+
+#[expect(clippy::ref_as_ptr, reason = "macro")]
+#[expect(clippy::inline_always, reason = "macro")]
+mod data {
+    #[allow(clippy::wildcard_imports)]
+    use super::*;
+
+    #[implement(IDropTarget)]
+    pub struct DropHandlerData {
+        pub load_file_fn: fn(PathBuf),
+        pub get_hwnd_fn: fn() -> &'static mut HWND,
+        pub state: AtomicU32,
+    }
 }
+#[allow(clippy::wildcard_imports)]
+use data::*;
 
-static mut VTABLE: Option<IDropTargetVtbl> = None;
-
-pub struct DropHandlerData {
-    drop_target: IDropTarget,
-    state: DWORD,
+impl Clone for DropHandlerData {
+    fn clone(&self) -> Self {
+        Self {
+            load_file_fn: self.load_file_fn,
+            get_hwnd_fn: self.get_hwnd_fn,
+            state: self.state.load(Ordering::Relaxed).into(),
+        }
+    }
 }
 
 pub struct DragAndDrop {
@@ -42,28 +69,10 @@ pub struct DragAndDrop {
 
 impl DragAndDrop {
     pub fn new<PTC: PTCVersion>() -> Self {
-        unsafe {
-            // the transmutes here are because the definitions in IDropTargetVtbl incorrectly
-            //   use `*const POINTL` instead of `POINTL` which messes up pdw_effect
-            // my functions correctly use POINTL so they need to be forced into place
-            VTABLE = Some(IDropTargetVtbl {
-                parent: IUnknownVtbl {
-                    QueryInterface: query_interface,
-                    AddRef: add_ref,
-                    Release: release,
-                },
-                DragEnter: transmute::<*const (), _>(drag_enter as *const ()),
-                DragOver: transmute::<*const (), _>(drag_over as *const ()),
-                DragLeave: drag_leave,
-                Drop: transmute::<*const (), _>(drop::<PTC> as *const ()),
-            });
-        }
-
         let data = DropHandlerData {
-            drop_target: IDropTarget {
-                lpVtbl: unsafe { VTABLE.as_ref() }.unwrap() as *const IDropTargetVtbl,
-            },
-            state: DROPEFFECT_NONE,
+            load_file_fn: PTC::load_file_no_history,
+            get_hwnd_fn: PTC::get_hwnd,
+            state: DROPEFFECT_NONE.0.into(),
         };
 
         Self { data }
@@ -83,30 +92,34 @@ impl<PTC: PTCVersion> Feature<PTC> for DragAndDrop {
 
     fn cleanup(&mut self) {
         unsafe {
-            RevokeDragDrop(*PTC::get_hwnd());
+            let _ = RevokeDragDrop(*PTC::get_hwnd());
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
-        if msg.message == winuser::WM_COMMAND {
-            let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
+    fn win_msg(&mut self, msg: &MSG) {
+        if msg.message == WM_COMMAND {
+            let high = hiword(msg.wParam.0.try_into().unwrap());
+            let low = loword(msg.wParam.0.try_into().unwrap());
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {
                 if low == *M_DRAGDROP_ID {
                     if winutil::menu_toggle(msg.hwnd, *M_DRAGDROP_ID) {
                         unsafe {
-                            let r = OleInitialize(ptr::null_mut());
-                            if r >= 0 {
-                                RegisterDragDrop(*PTC::get_hwnd(), &mut self.data.drop_target);
-                            } else {
-                                log::error!("OleInitialize failed: {}", r);
+                            let r = OleInitialize(None);
+                            if let Err(e) = r {
+                                log::error!("OleInitialize failed: {e}");
+                                return;
                             }
+                            RegisterDragDrop(
+                                *PTC::get_hwnd(),
+                                &IDropTarget::from(self.data.clone()),
+                            )
+                            .unwrap();
                         }
                     } else {
                         unsafe {
-                            RevokeDragDrop(*PTC::get_hwnd());
+                            RevokeDragDrop(*PTC::get_hwnd()).unwrap();
                         }
                     }
                 }
@@ -115,175 +128,166 @@ impl<PTC: PTCVersion> Feature<PTC> for DragAndDrop {
     }
 }
 
-// IUnknown
-
-unsafe extern "system" fn query_interface(
-    _this: *mut IUnknown,
-    _riid: REFIID,
-    _ppv_object: *mut *mut libc::c_void,
-) -> HRESULT {
-    unimplemented!();
-}
-
-unsafe extern "system" fn add_ref(_this: *mut IUnknown) -> ULONG {
-    // not really sure how bad this is but it seems unnecessary when I'm the one handling the memory
-    1
-}
-
-unsafe extern "system" fn release(_this: *mut IUnknown) -> ULONG {
-    // not really sure how bad this is but it seems unnecessary when I'm the one handling the memory
-    1
-}
-
 // IDropTarget
 
-unsafe extern "system" fn drag_enter(
-    this: *mut IDropTarget,
-    p_data_obj: *const IDataObject,
-    _grf_key_state: DWORD,
-    _pt: POINTL,
-    pdw_effect: *mut DWORD,
-) -> HRESULT {
-    let data = &mut *this.cast::<DropHandlerData>();
+impl IDropTarget_Impl for DropHandlerData_Impl {
+    fn DragEnter(
+        &self,
+        pdataobj: windows::core::Ref<windows::Win32::System::Com::IDataObject>,
+        _grfkeystate: windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS,
+        _pt: &POINTL,
+        pdweffect: *mut windows::Win32::System::Ole::DROPEFFECT,
+    ) -> windows::core::Result<()> {
+        let text = unsafe { get_text(pdataobj.unwrap()) };
 
-    let text = get_text(p_data_obj);
+        if text.is_some() {
+            unsafe {
+                *pdweffect = DROPEFFECT_COPY;
+            }
+            self.state.store(DROPEFFECT_COPY.0, Ordering::Relaxed);
+        }
 
-    if text.is_some() {
-        *pdw_effect = DROPEFFECT_COPY;
-        data.state = DROPEFFECT_COPY;
+        Ok(())
     }
 
-    0
-}
+    fn DragOver(
+        &self,
+        _grfkeystate: windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS,
+        _pt: &POINTL,
+        pdweffect: *mut windows::Win32::System::Ole::DROPEFFECT,
+    ) -> windows::core::Result<()> {
+        unsafe {
+            *pdweffect = DROPEFFECT(self.state.load(Ordering::Relaxed));
+        }
 
-unsafe extern "system" fn drag_over(
-    this: *mut IDropTarget,
-    _grf_key_state: DWORD,
-    _pt: POINTL,
-    pdw_effect: *mut DWORD,
-) -> HRESULT {
-    let data = &mut *this.cast::<DropHandlerData>();
+        Ok(())
+    }
 
-    *pdw_effect = data.state;
+    fn DragLeave(&self) -> windows::core::Result<()> {
+        Ok(())
+    }
 
-    0
-}
+    fn Drop(
+        &self,
+        pdataobj: windows::core::Ref<windows::Win32::System::Com::IDataObject>,
+        _grfkeystate: windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS,
+        _pt: &POINTL,
+        _pdweffect: *mut windows::Win32::System::Ole::DROPEFFECT,
+    ) -> windows::core::Result<()> {
+        // if the dropped item is text and is a ptweb url, get the id
+        // (the capture group for id explicitly allows '/' so it can match private urls)
+        let re =
+            Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-Z0-9/]+)$").unwrap();
+        let var_name = unsafe { get_text(pdataobj.unwrap()) };
+        let id = var_name.as_ref().and_then(|txt| {
+            re.captures(txt.as_str())
+                .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string()))
+        });
 
-unsafe extern "system" fn drag_leave(_this: *mut IDropTarget) -> HRESULT {
-    0
-}
+        if let Some(id) = id {
+            // format url for download
+            let url = format!("https://www.ptweb.me/get/{id}");
 
-unsafe extern "system" fn drop<PTC: PTCVersion>(
-    _this: *mut IDropTarget,
-    p_data_obj: *const IDataObject,
-    _grf_key_state: DWORD,
-    _pt: POINTL,
-    _pdw_effect: *mut DWORD,
-) -> HRESULT {
-    // if the dropped item is text and is a ptweb url, get the id
-    // (the capture group for id explicitly allows '/' so it can match private urls)
-    let re = Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-Z0-9/]+)$").unwrap();
-    let id = get_text(p_data_obj).as_ref().and_then(|txt| {
-        re.captures(txt.as_str())
-            .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string()))
-    });
+            log::info!("GET {url}");
 
-    if let Some(id) = id {
-        // format url for download
-        let url = format!("https://www.ptweb.me/get/{id}");
+            let res = reqwest::blocking::get(url)
+                .map_err(|e| format!("GET request failed: {e:?}"))
+                .and_then(|resp| {
+                    // got a response, check if 200
+                    log::debug!("{resp:?}");
 
-        log::info!("GET {url}");
-
-        let res = reqwest::blocking::get(url)
-            .map_err(|e| format!("GET request failed: {e:?}"))
-            .and_then(|resp| {
-                // got a response, check if 200
-                log::debug!("{resp:?}");
-
-                if resp.status() == reqwest::StatusCode::OK {
-                    Ok(resp)
-                } else {
-                    Err(format!("Response was: {}", resp.status()))
-                }
-            })
-            .and_then(|resp| {
-                // make temp folder
-                let mut pb = PathBuf::new();
-                pb.push("ptweb/");
-                std::fs::create_dir_all(pb.clone())
-                    .map_err(|e| format!("Failed to create dirs: {e:?}"))
-                    .map(|_| (resp, pb))
-            })
-            .and_then(|(resp, mut pb)| {
-                // try to extract filename from headers, otherwise use {id}.ptcop
-                let fname = resp
-                    .headers()
-                    .get("content-disposition")
-                    .and_then(|v| {
-                        v.to_str().ok().and_then(|s| {
-                            s.strip_prefix("attachment; filename=\"")
-                                .and_then(|s| s.strip_suffix('\"'))
+                    if resp.status() == reqwest::StatusCode::OK {
+                        Ok(resp)
+                    } else {
+                        Err(format!("Response was: {}", resp.status()))
+                    }
+                })
+                .and_then(|resp| {
+                    // make temp folder
+                    let mut pb = PathBuf::new();
+                    pb.push("ptweb/");
+                    std::fs::create_dir_all(pb.clone())
+                        .map_err(|e| format!("Failed to create dirs: {e:?}"))
+                        .map(|()| (resp, pb))
+                })
+                .and_then(|(resp, mut pb)| {
+                    // try to extract filename from headers, otherwise use {id}.ptcop
+                    let fname = resp
+                        .headers()
+                        .get("content-disposition")
+                        .and_then(|v| {
+                            v.to_str().ok().and_then(|s| {
+                                s.strip_prefix("attachment; filename=\"")
+                                    .and_then(|s| s.strip_suffix('\"'))
+                            })
                         })
-                    })
-                    .map(ToString::to_string)
-                    .unwrap_or(format!("{id}.ptcop"));
+                        .map(ToString::to_string)
+                        .unwrap_or(format!("{id}.ptcop"));
 
-                // make file in the temp folder
-                pb.push(fname);
-                File::create(pb.clone())
-                    .map_err(|e| format!("Failed to create file: {e:?}"))
-                    .map(|f| (resp, f, pb))
-            })
-            .and_then(|(resp, mut f, pb)| {
-                // copy payload bytes into file
-                std::io::copy(&mut resp.bytes().unwrap().as_ref(), &mut f)
-                    .map_err(|e| format!("Failed to write file: {e:?}"))
-                    .map(|_| pb)
-            })
-            .and_then(|pb| {
-                log::info!("Downloaded file!");
-                if pb.exists() {
-                    Ok(pb)
-                } else {
-                    Err(format!("File still doesn't exist: {pb:?}"))
-                }
-            });
+                    // make file in the temp folder
+                    pb.push(fname);
+                    File::create(pb.clone())
+                        .map_err(|e| format!("Failed to create file: {e:?}"))
+                        .map(|f| (resp, f, pb))
+                })
+                .and_then(|(resp, mut f, pb)| {
+                    // copy payload bytes into file
+                    std::io::copy(&mut resp.bytes().unwrap().as_ref(), &mut f)
+                        .map_err(|e| format!("Failed to write file: {e:?}"))
+                        .map(|_| pb)
+                })
+                .and_then(|pb| {
+                    log::info!("Downloaded file!");
+                    if pb.exists() {
+                        Ok(pb)
+                    } else {
+                        #[expect(clippy::unnecessary_debug_formatting, reason = "false positive")]
+                        Err(format!("File still doesn't exist: {pb:?}"))
+                    }
+                });
 
-        match res {
-            Err(msg) => log::error!("{msg}"),
-            Ok(pb) => {
-                // load the file into ptCollage
-                log::info!("Loading file...");
-                PTC::load_file_no_history(pb.clone());
-                winuser::InvalidateRect(*PTC::get_hwnd(), std::ptr::null(), 0);
-                log::info!("Loaded.");
-                // remove the temp file
-                log::info!("remove_file: {:?}", std::fs::remove_file(pb));
-                log::info!("Deleted tempfile.");
+            match res {
+                Err(msg) => log::error!("{msg}"),
+                Ok(pb) => {
+                    // load the file into ptCollage
+                    log::info!("Loading file...");
+                    (self.load_file_fn)(pb.clone());
+                    unsafe {
+                        InvalidateRect(Some(*(self.get_hwnd_fn)()), None, false).unwrap();
+                    }
+                    log::info!("Loaded.");
+                    // remove the temp file
+                    log::info!("remove_file: {:?}", std::fs::remove_file(pb));
+                    log::info!("Deleted tempfile.");
+                },
             }
         }
-    }
 
-    0
+        Ok(())
+    }
 }
 
-unsafe fn get_text(p_data_obj: *const IDataObject) -> Option<String> {
+unsafe fn get_text(p_data_obj: &IDataObject) -> Option<String> {
     let format = FORMATETC {
-        cfFormat: CF_TEXT as u16,
-        ptd: ptr::null(),
-        dwAspect: DVASPECT_CONTENT,
+        cfFormat: CF_UNICODETEXT.0,
+        ptd: ptr::null_mut(),
+        dwAspect: DVASPECT_CONTENT.0,
         lindex: -1,
-        tymed: TYMED_HGLOBAL,
+        tymed: TYMED_HGLOBAL.0 as _,
     };
 
-    let mut storage = std::mem::zeroed();
-    let r = (*p_data_obj).GetData(&format, &mut storage);
-    if r >= 0 {
-        let data = (*storage.u).hGlobal();
-        let txt = CString::from_raw((*data).cast::<i8>());
-        let str = txt.to_str().unwrap().to_string();
-        Some(str)
-    } else {
-        None
+    unsafe {
+        let r = p_data_obj.GetData(&raw const format);
+        if let Ok(mut storage) = r {
+            let ptr = GlobalLock(storage.u.hGlobal) as *const u16;
+            let txt = widestring::U16CStr::from_ptr_str(ptr);
+            let str = txt.to_string_lossy();
+
+            let _ = GlobalUnlock(storage.u.hGlobal);
+            ReleaseStgMedium(&raw mut storage);
+            Some(str)
+        } else {
+            None
+        }
     }
 }

@@ -1,16 +1,16 @@
-use winapi::um::winuser;
+use std::sync::LazyLock;
+
+use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_COMMAND};
 
 use crate::{
     patch::Patch,
-    ptc::{addr, PTCVersion},
-    winutil::{self, Menus},
+    ptc::{PTCVersion, addr},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_FPS_UNLOCK_ID: u16 = winutil::next_id();
-}
+static M_FPS_UNLOCK_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub struct FPSUnlock {
     patch: Vec<Patch>,
@@ -48,7 +48,7 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("note_rect_hook_patch: {:?}", e);
+                    log::warn!("note_rect_hook_patch: {e:?}");
                 }
             }
 
@@ -57,10 +57,10 @@ impl<PTC: PTCVersion> Feature<PTC> for FPSUnlock {
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
-        if msg.message == winuser::WM_COMMAND {
-            let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
+    fn win_msg(&mut self, msg: &MSG) {
+        if msg.message == WM_COMMAND {
+            let high = hiword(msg.wParam.0.try_into().unwrap());
+            let low = loword(msg.wParam.0.try_into().unwrap());
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {

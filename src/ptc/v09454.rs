@@ -1,18 +1,21 @@
 use widestring::U16CString;
-use winapi::shared::{minwindef::HINSTANCE, windef::HWND};
+use windows::{
+    Win32::Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+    core::PCWSTR,
+};
 
 use crate::{
     feature::{
-        custom_note_rendering::{self, CustomNoteRendering},
         drag_and_drop::DragAndDrop,
         fps_display_fix::FPSDisplayFix,
         playhead::{self, Playhead},
         scroll_hook::{self, Scroll},
     },
-    patch::{hook, hook_pre_ret_new, Patch},
+    patch::{Patch, hook, hook_pre_ret_new},
+    ptc::drawing::Rect,
 };
 
-use super::{addr, color_abgr_to_argb, color_argb_to_abgr, PTCVersion};
+use super::{PTCVersion, Selection, addr, color_abgr_to_argb, color_argb_to_abgr};
 
 pub struct PTC09454;
 
@@ -22,52 +25,54 @@ impl PTCVersion for PTC09454 {
 
         let unit_clear_hook_patch =
             hook!(0x7920a, 0x78a60, "cdecl", fn(a: *mut f32), |_old_fn, _a| {
-                scroll_hook::unit_clear::<PTC09454>();
+                unsafe {
+                    scroll_hook::unit_clear::<PTC09454>();
+                }
             });
 
         let f_scroll_hook = Scroll::new::<Self>(unit_clear_hook_patch);
 
         // custom note rendering
 
-        let note_rect_push_ebp = Patch::new(0x74cb7, vec![0x51], vec![0x55]).unwrap();
-        let note_rect_hook_patch = hook!(
-            0x74cc5,
-            0x7570,
-            "thiscall",
-            fn(this: *mut (), rect: *const [f32; 4], ebp: u32),
-            |_old_fn, _this, rect: *const [f32; 4], ebp| {
-                let not_focused = *((ebp - 0xbc) as *mut u32) != 0;
-                let unit = *((ebp - 0xcc) as *mut u32);
-                // let not_focused = false;
-                // let unit = 3;
-                let rect = [
-                    (*rect)[0] as i32,
-                    (*rect)[1] as i32,
-                    (*rect)[2] as i32,
-                    (*rect)[3] as i32,
-                ];
-                custom_note_rendering::draw_unit_note_rect::<PTC09454>(
-                    rect.as_ptr(),
-                    unit,
-                    not_focused,
-                );
-            }
-        );
+        // let note_rect_push_ebp = Patch::new(0x74cb7, vec![0x51], vec![0x55]).unwrap();
+        // let note_rect_hook_patch = hook!(
+        //     0x74cc5,
+        //     0x7570,
+        //     "thiscall",
+        //     fn(this: *mut (), rect: *const [f32; 4], ebp: u32),
+        //     |_old_fn, _this, rect: *const [f32; 4], ebp| {
+        //         let not_focused = *((ebp - 0xbc) as *mut u32) != 0;
+        //         let unit = *((ebp - 0xcc) as *mut u32);
+        //         // let not_focused = false;
+        //         // let unit = 3;
+        //         let rect = [
+        //             (*rect)[0] as i32,
+        //             (*rect)[1] as i32,
+        //             (*rect)[2] as i32,
+        //             (*rect)[3] as i32,
+        //         ];
+        //         custom_note_rendering::draw_unit_note_rect::<PTC09454>(
+        //             rect.as_ptr(),
+        //             unit,
+        //             not_focused,
+        //         );
+        //     }
+        // );
 
-        // for some reason NOPing the draw_image call directly crashes unlike in 0.9.2.5
-        // instead, this changes the conditional jumps around the draw_image calls into unconditional jumps
-        // so the draw_image is skipped
-        let note_disable_left_edge =
-            Patch::new(0x74ce2, vec![0x72, 0x3e], vec![0xeb, 0x3e]).unwrap();
-        let note_disable_right_edge =
-            Patch::new(0x74d31, vec![0x76, 0x41], vec![0xeb, 0x41]).unwrap();
+        // // for some reason NOPing the draw_image call directly crashes unlike in 0.9.2.5
+        // // instead, this changes the conditional jumps around the draw_image calls into unconditional jumps
+        // // so the draw_image is skipped
+        // let note_disable_left_edge =
+        //     Patch::new(0x74ce2, vec![0x72, 0x3e], vec![0xeb, 0x3e]).unwrap();
+        // let note_disable_right_edge =
+        //     Patch::new(0x74d31, vec![0x76, 0x41], vec![0xeb, 0x41]).unwrap();
 
-        let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
-            note_rect_push_ebp,
-            note_rect_hook_patch,
-            note_disable_left_edge,
-            note_disable_right_edge,
-        );
+        // let f_custom_note_rendering = CustomNoteRendering::new::<Self>(
+        //     note_rect_push_ebp,
+        //     note_rect_hook_patch,
+        //     note_disable_left_edge,
+        //     note_disable_right_edge,
+        // );
 
         // playhead
 
@@ -94,7 +99,7 @@ impl PTCVersion for PTC09454 {
              x,
              y,
              num,
-             digit| {
+             digit| unsafe {
                 func(x - 6.0, y, num, digit);
             }
         );
@@ -115,7 +120,7 @@ impl PTCVersion for PTC09454 {
              x,
              y,
              p3,
-             p4| {
+             p4| unsafe {
                 func(this, x - 6.0, y, p3, p4);
             }
         );
@@ -125,7 +130,7 @@ impl PTCVersion for PTC09454 {
 
         vec![
             Box::new(f_scroll_hook),
-            Box::new(f_custom_note_rendering),
+            // Box::new(f_custom_note_rendering),
             Box::new(f_playhead),
             Box::new(DragAndDrop::new::<Self>()),
             Box::new(f_fps_display_fix),
@@ -136,7 +141,7 @@ impl PTCVersion for PTC09454 {
         unsafe { &mut *(addr(0xbddd0) as *mut HWND) }
     }
 
-    fn get_hinstance() -> &'static mut winapi::shared::minwindef::HINSTANCE {
+    fn get_hinstance() -> &'static mut HINSTANCE {
         unsafe { &mut *(addr(0xbddcc) as *mut HINSTANCE) }
     }
 
@@ -229,28 +234,72 @@ impl PTCVersion for PTC09454 {
         .max(0)
     }
 
-    fn get_unit_rect() -> [i32; 4] {
+    fn get_unit_rect() -> Rect<i32> {
         // this version's rectangles are floats while 0.9.2.5 is ints
         unsafe {
-            [
+            Rect::new(
                 *(addr(0xbfe48) as *const f32) as i32,
                 *(addr(0xbfe48 + 0x04) as *const f32) as i32,
                 *(addr(0xbfe48 + 0x08) as *const f32) as i32,
                 *(addr(0xbfe48 + 0x0c) as *const f32) as i32,
-            ]
+            )
         }
     }
 
-    fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize
+    fn get_kb_rect() -> Rect<i32> {
+        todo!()
+    }
+
+    fn get_event_list() -> &'static mut super::events::EventList {
+        todo!()
+    }
+
+    fn is_unit_highlighted(_unit_no: i32) -> bool {
+        todo!()
+    }
+
+    fn get_focused_unit() -> i32 {
+        todo!()
+    }
+
+    fn get_selected_range() -> Selection {
+        todo!()
+    }
+
+    fn get_unit_scroll_ofs_x() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_unit_scroll_ofs_y() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_kb_scroll_ofs_x() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_kb_scroll_ofs_y() -> &'static i32 {
+        todo!()
+    }
+
+    fn get_unit_num() -> i32 {
+        todo!()
+    }
+
+    fn get_events_for_unit(_unit_no: i32) -> &'static [super::events::Event] {
+        todo!()
+    }
+
+    fn get_fill_about_dialog()
+    -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize
     {
         unsafe extern "system" fn fill_about_dialog(
             hwnd: HWND,
             msg: u32,
-            w_param: usize,
-            l_param: isize,
+            w_param: WPARAM,
+            l_param: LPARAM,
         ) -> isize {
-            crate::runtime::fill_about_dialog::<PTC09454>(hwnd, msg, w_param, l_param)
+            unsafe { crate::runtime::fill_about_dialog::<PTC09454>(hwnd, msg, w_param, l_param) }
         }
         fill_about_dialog
     }
@@ -316,6 +365,7 @@ impl PTCVersion for PTC09454 {
     }
 
     fn load_file_no_history(path: std::path::PathBuf) {
+        #[expect(clippy::unnecessary_debug_formatting, reason = "false positive")]
         unsafe {
             log::debug!("load_file_no_history({path:?})");
 
@@ -393,9 +443,9 @@ impl PTCVersion for PTC09454 {
             // (clear_save_path)(addr(0xbe04c) as *mut _);
 
             log::debug!("set_window_title_path({cstr:?})");
-            let set_window_title_path: unsafe extern "cdecl" fn(path: winapi::um::winnt::LPCWSTR) =
+            let set_window_title_path: unsafe extern "cdecl" fn(path: PCWSTR) =
                 std::mem::transmute(addr(0x59650) as *const ());
-            (set_window_title_path)(cstr.as_ptr());
+            (set_window_title_path)(PCWSTR(cstr.as_ptr()));
 
             log::debug!("done.");
 
@@ -414,5 +464,9 @@ impl PTCVersion for PTC09454 {
             // let _r = (read_file2)(*Self::get_hwnd(), cstr.as_ptr(), &mut a, &mut b);
             // log::debug!("read_file2 => {r}");
         }
+    }
+
+    fn volume_adjust_fill_selected_units(_hwnd: HWND) -> bool {
+        todo!()
     }
 }

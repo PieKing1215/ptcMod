@@ -1,17 +1,17 @@
-use winapi::um::winuser;
+use std::sync::LazyLock;
+
+use windows::Win32::UI::WindowsAndMessaging::{MSG, WM_COMMAND};
 
 use crate::{
     feature::scroll_hook,
     patch::Patch,
     ptc::PTCVersion,
-    winutil::{self, Menus},
+    winutil::{self, Menus, hiword, loword},
 };
 
 use super::Feature;
 
-lazy_static::lazy_static! {
-    static ref M_PLAYHEAD_ID: u16 = winutil::next_id();
-}
+static M_PLAYHEAD_ID: LazyLock<u16> = LazyLock::new(winutil::next_id);
 
 pub struct Playhead {
     patch: Vec<Patch>,
@@ -38,16 +38,16 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
         unsafe {
             for p in &self.patch {
                 if let Err(e) = p.unapply() {
-                    log::warn!("note_rect_hook_patch: {:?}", e);
+                    log::warn!("note_rect_hook_patch: {e:?}");
                 }
             }
         }
     }
 
-    fn win_msg(&mut self, msg: &winapi::um::winuser::MSG) {
-        if msg.message == winuser::WM_COMMAND {
-            let high = winapi::shared::minwindef::HIWORD(msg.wParam.try_into().unwrap());
-            let low = winapi::shared::minwindef::LOWORD(msg.wParam.try_into().unwrap());
+    fn win_msg(&mut self, msg: &MSG) {
+        if msg.message == WM_COMMAND {
+            let high = hiword(msg.wParam.0.try_into().unwrap());
+            let low = loword(msg.wParam.0.try_into().unwrap());
 
             #[allow(clippy::collapsible_if)]
             if high == 0 {
@@ -76,12 +76,18 @@ impl<PTC: PTCVersion> Feature<PTC> for Playhead {
 }
 
 pub(crate) unsafe fn draw_unitkb_top<PTC: PTCVersion>() {
-    if scroll_hook::ENABLED && PTC::is_playing() && *PTC::get_tab() > 0 {
+    if unsafe { scroll_hook::ENABLED } && PTC::is_playing() && *PTC::get_tab() > 0 {
         let unit_rect = PTC::get_unit_rect();
+        let kb_rect = PTC::get_kb_rect();
 
-        let x = crate::feature::scroll_hook::LAST_PLAYHEAD_POS;
+        let x = unsafe { scroll_hook::LAST_PLAYHEAD_POS };
 
-        let rect = [x, unit_rect[1], x + 2, unit_rect[3]];
+        let rect = [
+            x,
+            unit_rect.top.min(kb_rect.top),
+            x + 2,
+            unit_rect.bottom.max(kb_rect.bottom),
+        ];
         PTC::draw_rect(rect, 0xffcccccc);
     }
 }

@@ -2,18 +2,18 @@ use std::ffi::CString;
 use std::io;
 use std::mem;
 use std::path::Path;
-use std::ptr;
 
-use winapi::shared::minwindef::LPCVOID;
-use winapi::um::handleapi::CloseHandle;
-use winapi::um::libloaderapi::GetModuleHandleA;
-use winapi::um::libloaderapi::GetProcAddress;
-use winapi::um::memoryapi::VirtualAllocEx;
-use winapi::um::memoryapi::WriteProcessMemory;
-use winapi::um::processthreadsapi::CreateRemoteThread;
-use winapi::um::winnt::HANDLE;
-use winapi::um::winnt::PAGE_READWRITE;
-use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE};
+use windows::Win32::Foundation::CloseHandle;
+use windows::Win32::Foundation::HANDLE;
+use windows::Win32::System::Diagnostics::Debug::WriteProcessMemory;
+use windows::Win32::System::LibraryLoader::GetModuleHandleA;
+use windows::Win32::System::LibraryLoader::GetProcAddress;
+use windows::Win32::System::Memory::MEM_COMMIT;
+use windows::Win32::System::Memory::MEM_RESERVE;
+use windows::Win32::System::Memory::PAGE_READWRITE;
+use windows::Win32::System::Memory::VirtualAllocEx;
+use windows::Win32::System::Threading::CreateRemoteThread;
+use windows::core::PCSTR;
 
 /// Injects the dll at `dll_path` into the given process
 pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
@@ -31,7 +31,7 @@ pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
     let path_addr = unsafe {
         VirtualAllocEx(
             process,
-            ptr::null_mut(),
+            None,
             path_size,
             MEM_RESERVE | MEM_COMMIT,
             PAGE_READWRITE,
@@ -51,23 +51,22 @@ pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
         WriteProcessMemory(
             process,
             path_addr,
-            dll_path.as_ptr() as LPCVOID,
+            dll_path.as_ptr().cast(),
             path_size,
-            ptr::null_mut(),
+            None,
         )
     };
 
-    if suc == 0 {
-        let err = io::Error::last_os_error();
+    if let Err(err) = suc {
         eprintln!("WriteProcessMemory failed: {:?}", err);
-        return Err(err);
+        return Err(err.into());
     }
 
     // find LoadLibraryA address
     println!("Looking for LoadLibraryA...");
     let load_library_a = unsafe {
-        let kernel = GetModuleHandleA(b"Kernel32.dll\0".as_ptr() as *const _);
-        GetProcAddress(kernel, b"LoadLibraryA\0".as_ptr() as *const _)
+        let kernel = GetModuleHandleA(PCSTR(c"Kernel32.dll".as_ptr().cast())).unwrap();
+        GetProcAddress(kernel, PCSTR(c"LoadLibraryA".as_ptr().cast())).unwrap()
     };
     println!("-> {:#p}", load_library_a);
 
@@ -76,25 +75,30 @@ pub fn inject_dll(process: HANDLE, dll_path: &Path) -> io::Result<()> {
     let thread_handle = unsafe {
         CreateRemoteThread(
             process,
-            ptr::null_mut(),
+            None,
             0,
-            Some(mem::transmute(load_library_a)),
-            path_addr,
+            Some(mem::transmute::<
+                unsafe extern "system" fn() -> isize,
+                unsafe extern "system" fn(*mut std::ffi::c_void) -> u32,
+            >(load_library_a)),
+            Some(path_addr),
             0,
-            ptr::null_mut(),
+            None,
         )
     };
 
-    if thread_handle.is_null() {
-        let err = io::Error::last_os_error();
-        eprintln!("CreateRemoteThread failed: {:?}", err);
-        return Err(err);
-    }
-    println!("-> {:#p}", thread_handle);
+    let thread_handle = match thread_handle {
+        Ok(thread_handle) => thread_handle,
+        Err(err) => {
+            eprintln!("CreateRemoteThread failed: {:?}", err);
+            return Err(err.into());
+        },
+    };
+    println!("-> {:#p}", thread_handle.0);
 
     // don't care about this thread anymore
     unsafe {
-        CloseHandle(thread_handle);
+        CloseHandle(thread_handle).unwrap();
     }
 
     println!("Done.");

@@ -1,15 +1,41 @@
+pub mod drawing;
+pub mod events;
 pub mod v0925;
 pub mod v09454;
 
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::LazyLock};
 
-use winapi::{
-    shared::{minwindef::HINSTANCE, windef::HWND},
-    um::libloaderapi::GetModuleHandleA,
+use windows::{
+    Win32::{
+        Foundation::{HINSTANCE, HWND, LPARAM, WPARAM},
+        System::LibraryLoader::GetModuleHandleA,
+    },
+    core::PCSTR,
 };
 
-use crate::feature::Feature;
+use crate::{feature::Feature, ptc::drawing::Rect};
 
+use self::events::{Event, EventList};
+
+static BASE_ADDR: LazyLock<usize> = LazyLock::new(|| unsafe {
+    GetModuleHandleA(PCSTR(
+        "ptCollage.exe\0".bytes().collect::<Vec<u8>>().as_ptr(),
+    ))
+    .unwrap()
+    .0 as usize
+});
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Selection {
+    pub meas_min: i32,
+    pub meas_max: i32,
+    pub beat_min: i32,
+    pub beat_max: i32,
+    pub clock_min: i32,
+    pub clock_max: i32,
+}
+
+#[allow(unused)]
 pub trait PTCVersion {
     fn get_features() -> Vec<Box<dyn Feature<Self>>>;
     fn get_hwnd() -> &'static mut HWND;
@@ -28,9 +54,27 @@ pub trait PTCVersion {
     fn get_play_pos() -> &'static mut u32;
     fn get_scroll() -> &'static mut i32;
     fn get_scroll_max() -> i32;
-    fn get_unit_rect() -> [i32; 4];
-    fn get_fill_about_dialog(
-    ) -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: usize, l_param: isize) -> isize;
+    fn get_unit_rect() -> Rect<i32>;
+    fn get_kb_rect() -> Rect<i32>;
+    fn get_event_list() -> &'static mut EventList;
+    fn is_unit_highlighted(unit_no: i32) -> bool;
+    fn get_focused_unit() -> i32;
+    fn get_selected_range() -> Selection;
+    fn get_unit_scroll_ofs_x() -> &'static i32;
+    fn get_unit_scroll_ofs_y() -> &'static i32;
+    fn get_kb_scroll_ofs_x() -> &'static i32;
+    fn get_kb_scroll_ofs_y() -> &'static i32;
+    fn get_unit_num() -> i32;
+    fn get_events_for_unit(unit_no: i32) -> &'static [Event];
+
+    fn calc_clock_pos(meas: i32, beat: i32, clock: i32) -> i32 {
+        *Self::get_beat_num() as i32 * Self::get_beat_clock() as i32 * meas
+            + Self::get_beat_clock() as i32 * beat
+            + clock
+    }
+
+    fn get_fill_about_dialog()
+    -> unsafe extern "system" fn(hwnd: HWND, msg: u32, w_param: WPARAM, l_param: LPARAM) -> isize;
     fn center_window(hwnd: HWND);
     fn about_dlg_fn_2(hwnd: HWND);
     fn get_about_dialog_text_ids() -> (i32, i32, i32, i32);
@@ -38,19 +82,11 @@ pub trait PTCVersion {
     fn get_base_note_colors_argb() -> [u32; 2];
     fn get_event_value_at_screen_pos(pos_x: i32, unit_no: i32, ev_type: i32) -> i32;
     fn load_file_no_history(path: PathBuf);
+    fn volume_adjust_fill_selected_units(hwnd: HWND) -> bool;
 }
 
 pub fn addr(relative: usize) -> usize {
-    unsafe {
-        let base = GetModuleHandleA(
-            "ptCollage.exe\0"
-                .bytes()
-                .collect::<Vec<u8>>()
-                .as_ptr()
-                .cast::<i8>(),
-        ) as usize;
-        base + relative
-    }
+    *BASE_ADDR + relative
 }
 
 // these two fns are functionally identical, but it's probably better to be explicit with the conversion
