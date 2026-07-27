@@ -21,6 +21,11 @@ jobs:
         rustup target add i686-pc-windows-gnu
         rustup toolchain install nightly-i686-pc-windows-gnu
 
+    - name: Set up MinGW
+      uses: egor-tensin/setup-mingw@41b837e47d7f85214629d255b9c4bc3fcbe9fd63 # v3.0
+      with:
+        platform: x86
+
     - name: Build
       run: cargo build --release --verbose
 
