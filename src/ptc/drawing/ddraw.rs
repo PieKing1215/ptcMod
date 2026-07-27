@@ -3,8 +3,8 @@ use std::mem::ManuallyDrop;
 use windows::Win32::{
     Foundation::HANDLE,
     Graphics::DirectDraw::{
-        DDBLT_COLORFILL, DDBLT_DDFX, DDBLT_WAIT, DDBLTBATCH, DDLOCK_WAIT, DDSURFACEDESC,
-        IDirectDrawSurface,
+        DDBLT_COLORFILL, DDBLT_DDFX, DDBLT_WAIT, DDBLTBATCH, DDLOCK_WAIT, DDSD_CAPS, DDSD_HEIGHT,
+        DDSD_WIDTH, DDSURFACEDESC, IDirectDrawSurface,
     },
 };
 use windows_core::Interface;
@@ -29,13 +29,15 @@ impl Draw for IDirectDrawSurface {
         ddbltfx[0] = 100;
         ddbltfx[20] = color.into_argb();
         let mut rect = *rect;
-        let _ = self.Blt(
-            rect.as_lprect(),
-            None,
-            std::ptr::null_mut(),
-            (DDBLT_COLORFILL | DDBLT_WAIT | DDBLT_DDFX) as _,
-            ddbltfx.as_mut_ptr().cast(),
-        );
+        let _ = unsafe {
+            self.Blt(
+                rect.as_lprect(),
+                None,
+                std::ptr::null_mut(),
+                (DDBLT_COLORFILL | DDBLT_WAIT | DDBLT_DDFX) as _,
+                ddbltfx.as_mut_ptr().cast(),
+            )
+        };
     }
 
     unsafe fn fill_rect_batch(&self, rects: Vec<Rect<i32>>, color: Color) {
@@ -56,7 +58,7 @@ impl Draw for IDirectDrawSurface {
             })
             .collect();
 
-        let _ = self.BltBatch(batches.as_mut_ptr(), batches.len() as u32, 0);
+        let _ = unsafe { self.BltBatch(batches.as_mut_ptr(), batches.len() as u32, 0) };
     }
 
     fn set_pixels(&self, modify: impl FnOnce(&mut dyn FnMut(i32, i32, Color))) {
@@ -85,9 +87,12 @@ impl Draw for IDirectDrawSurface {
             let pitch = desc.Anonymous1.lPitch as isize;
 
             let mut set_pixel = |x, y, color: Color| {
+                #[expect(clippy::cast_ptr_alignment, reason = "asserted below")]
                 let pixel = pixels
                     .offset(y as isize * pitch + x as isize * 4)
                     .cast::<u32>();
+                assert!(pixel.is_aligned());
+
                 let dst = Color::from_argb(*pixel);
                 *pixel = dst.blend(color, color.a_f32()).with_a(u8::MAX).into_argb();
             };
@@ -104,26 +109,29 @@ pub unsafe fn create_surface(
     width: i32,
     height: i32,
 ) -> IDirectDrawSurface {
+    // TODO: is this still necessary or is this function in the windows crate
     #[allow(clippy::ptr_as_ptr)]
     let raw_fn: unsafe extern "stdcall" fn(
         this: *mut libc::c_void,
         surface_desc: *mut libc::c_void,
         out_surf: *mut *mut libc::c_void,
         unused: *mut libc::c_void,
-    ) = std::mem::transmute(*((*(ddraw as *mut usize) + 0x18) as *const *const ()));
+    ) = unsafe { std::mem::transmute(*((*(ddraw as *mut usize) + 0x18) as *const *const ())) };
 
     let mut surface_desc = [0_i32; 0x6c / 4];
     surface_desc[0] = 0x6c; // dwSize
-    surface_desc[1] = 0x00000001 | 0x00000002 | 0x00000004; // dwFlags = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH
+    surface_desc[1] = DDSD_CAPS | DDSD_HEIGHT | DDSD_WIDTH; // dwFlags
     surface_desc[2] = height; // dwHeight
     surface_desc[3] = width; // dwWidth
 
     let mut out_surf = std::ptr::null_mut();
-    (raw_fn)(
-        ddraw,
-        surface_desc.as_mut_ptr().cast(),
-        &raw mut out_surf,
-        std::ptr::null_mut(),
-    );
-    IDirectDrawSurface::from_raw(out_surf)
+    unsafe {
+        (raw_fn)(
+            ddraw,
+            surface_desc.as_mut_ptr().cast(),
+            &raw mut out_surf,
+            std::ptr::null_mut(),
+        );
+    };
+    unsafe { IDirectDrawSurface::from_raw(out_surf) }
 }

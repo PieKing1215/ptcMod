@@ -402,7 +402,7 @@ impl PTCVersion for PTC0925 {
             w_param: WPARAM,
             l_param: LPARAM,
         ) -> isize {
-            crate::runtime::fill_about_dialog::<PTC0925>(hwnd, msg, w_param, l_param)
+            unsafe { crate::runtime::fill_about_dialog::<PTC0925>(hwnd, msg, w_param, l_param) }
         }
         fill_about_dialog
     }

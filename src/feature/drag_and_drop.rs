@@ -276,16 +276,18 @@ unsafe fn get_text(p_data_obj: &IDataObject) -> Option<String> {
         tymed: TYMED_HGLOBAL.0 as _,
     };
 
-    let r = p_data_obj.GetData(&raw const format);
-    if let Ok(mut storage) = r {
-        let ptr = GlobalLock(storage.u.hGlobal) as *const u16;
-        let txt = widestring::U16CStr::from_ptr_str(ptr);
-        let str = txt.to_string_lossy();
+    unsafe {
+        let r = p_data_obj.GetData(&raw const format);
+        if let Ok(mut storage) = r {
+            let ptr = GlobalLock(storage.u.hGlobal) as *const u16;
+            let txt = widestring::U16CStr::from_ptr_str(ptr);
+            let str = txt.to_string_lossy();
 
-        let _ = GlobalUnlock(storage.u.hGlobal);
-        ReleaseStgMedium(&raw mut storage);
-        Some(str)
-    } else {
-        None
+            let _ = GlobalUnlock(storage.u.hGlobal);
+            ReleaseStgMedium(&raw mut storage);
+            Some(str)
+        } else {
+            None
+        }
     }
 }

@@ -25,7 +25,9 @@ impl PTCVersion for PTC09454 {
 
         let unit_clear_hook_patch =
             hook!(0x7920a, 0x78a60, "cdecl", fn(a: *mut f32), |_old_fn, _a| {
-                scroll_hook::unit_clear::<PTC09454>();
+                unsafe {
+                    scroll_hook::unit_clear::<PTC09454>();
+                }
             });
 
         let f_scroll_hook = Scroll::new::<Self>(unit_clear_hook_patch);
@@ -97,7 +99,7 @@ impl PTCVersion for PTC09454 {
              x,
              y,
              num,
-             digit| {
+             digit| unsafe {
                 func(x - 6.0, y, num, digit);
             }
         );
@@ -118,7 +120,7 @@ impl PTCVersion for PTC09454 {
              x,
              y,
              p3,
-             p4| {
+             p4| unsafe {
                 func(this, x - 6.0, y, p3, p4);
             }
         );
@@ -297,7 +299,7 @@ impl PTCVersion for PTC09454 {
             w_param: WPARAM,
             l_param: LPARAM,
         ) -> isize {
-            crate::runtime::fill_about_dialog::<PTC09454>(hwnd, msg, w_param, l_param)
+            unsafe { crate::runtime::fill_about_dialog::<PTC09454>(hwnd, msg, w_param, l_param) }
         }
         fill_about_dialog
     }

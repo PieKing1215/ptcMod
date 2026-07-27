@@ -199,13 +199,15 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 // can't match against statics
                 if low == *M_ABOUT_ID {
                     let l_template: Vec<u8> = "DLG_ABOUT\0".bytes().collect();
-                    DialogBoxParamA(
-                        Some(*PTC::get_hinstance()),
-                        PCSTR(l_template.as_ptr()),
-                        Some(msg.hwnd),
-                        Some(PTC::get_fill_about_dialog()),
-                        LPARAM(0),
-                    );
+                    unsafe {
+                        DialogBoxParamA(
+                            Some(*PTC::get_hinstance()),
+                            PCSTR(l_template.as_ptr()),
+                            Some(msg.hwnd),
+                            Some(PTC::get_fill_about_dialog()),
+                            LPARAM(0),
+                        )
+                    };
                 } else if low == *M_UNINJECT_ID {
                     SENDER.get().unwrap().send(MsgType::Uninject).unwrap();
                 }
@@ -224,11 +226,11 @@ unsafe extern "system" fn hook_ex(code: i32, w_param: WPARAM, l_param: LPARAM) -
     if code >= 0 {
         // need to copy since we handle this on the main thread, so the pointer will be gone
         // (not sure if this is really safe or not)
-        let msg = *(l_param.0 as *const MSG);
+        let msg = unsafe { *(l_param.0 as *const MSG) };
         let _ = SENDER.get().unwrap().send(MsgType::WinMsg(msg));
     }
 
-    CallNextHookEx(None, code, w_param, l_param)
+    unsafe { CallNextHookEx(None, code, w_param, l_param) }
 }
 
 pub unsafe fn fill_about_dialog<PTC: PTCVersion>(
@@ -239,16 +241,18 @@ pub unsafe fn fill_about_dialog<PTC: PTCVersion>(
 ) -> isize {
     if msg == WM_INITDIALOG {
         let ids = PTC::get_about_dialog_text_ids();
-        let msg_1: Vec<u8> = "PTC Mod\0".bytes().collect();
-        SetDlgItemTextA(hwnd, ids.0, PCSTR(msg_1.as_ptr())).unwrap();
-        let msg_2: Vec<u8> = "PieKing1215\0".bytes().collect();
-        SetDlgItemTextA(hwnd, ids.1, PCSTR(msg_2.as_ptr())).unwrap();
-        let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown"))
-            .bytes()
-            .collect();
-        SetDlgItemTextA(hwnd, ids.2, PCSTR(msg_3.as_ptr())).unwrap();
-        let msg_4: Vec<u8> = "alpha test\0".bytes().collect();
-        SetDlgItemTextA(hwnd, ids.3, PCSTR(msg_4.as_ptr())).unwrap();
+        unsafe {
+            let msg_1: Vec<u8> = "PTC Mod\0".bytes().collect();
+            SetDlgItemTextA(hwnd, ids.0, PCSTR(msg_1.as_ptr())).unwrap();
+            let msg_2: Vec<u8> = "PieKing1215\0".bytes().collect();
+            SetDlgItemTextA(hwnd, ids.1, PCSTR(msg_2.as_ptr())).unwrap();
+            let msg_3: Vec<u8> = format!("version.{}\0", VERSION.unwrap_or("unknown"))
+                .bytes()
+                .collect();
+            SetDlgItemTextA(hwnd, ids.2, PCSTR(msg_3.as_ptr())).unwrap();
+            let msg_4: Vec<u8> = "alpha test\0".bytes().collect();
+            SetDlgItemTextA(hwnd, ids.3, PCSTR(msg_4.as_ptr())).unwrap();
+        }
 
         PTC::center_window(hwnd);
         PTC::about_dlg_fn_2(hwnd);
@@ -259,10 +263,10 @@ pub unsafe fn fill_about_dialog<PTC: PTCVersion>(
         if high == 0 {
             if low == 1 {
                 // click "OK"
-                EndDialog(hwnd, 1).unwrap();
+                unsafe { EndDialog(hwnd, 1).unwrap() };
             } else if l_param.0 == 2 {
                 // ESC key
-                EndDialog(hwnd, 0).unwrap();
+                unsafe { EndDialog(hwnd, 0).unwrap() };
             }
         }
     }

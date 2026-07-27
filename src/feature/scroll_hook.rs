@@ -107,7 +107,7 @@ impl<PTC: PTCVersion> Feature<PTC> for Scroll {
 }
 
 pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
-    if let (Some(i), Some(cap)) = (LAST_TICK_TIME, FPS_CAP) {
+    if let (Some(i), Some(cap)) = unsafe { (LAST_TICK_TIME, FPS_CAP) } {
         let elapsed = i.elapsed();
         if elapsed.as_secs_f32() < 1.0 / (cap.get() as f32) {
             let dur = Duration::from_secs_f32(1.0 / (cap.get() as f32))
@@ -117,7 +117,7 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
             thread::sleep(dur);
         }
     }
-    LAST_TICK_TIME = Some(Instant::now());
+    unsafe { LAST_TICK_TIME = Some(Instant::now()) };
 
     if PTC::is_playing() && *PTC::get_tab() > 0 {
         {
@@ -125,10 +125,10 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
 
             let mut play_pos =
                 *PTC::get_play_pos() / PTC::get_buffer_size() * PTC::get_buffer_size();
-            if play_pos != LAST_PLAY_POS {
-                LAST_PLAY_POS_TIME = Some(Instant::now());
-                LAST_PLAY_POS = play_pos;
-            } else if let Some(i) = LAST_PLAY_POS_TIME {
+            if play_pos != unsafe { LAST_PLAY_POS } {
+                unsafe { LAST_PLAY_POS_TIME = Some(Instant::now()) };
+                unsafe { LAST_PLAY_POS = play_pos };
+            } else if let Some(i) = unsafe { LAST_PLAY_POS_TIME } {
                 play_pos += (44100.0
                     * Instant::now()
                         .saturating_duration_since(i)
@@ -144,7 +144,7 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
                 / (PTC::get_beat_clock() as f32))
                 / 22050.0) as i32;
 
-            LAST_SCROLL = des_scroll;
+            unsafe { LAST_SCROLL = des_scroll };
 
             if smooth {
                 // let view_rect = PTC::get_unit_rect();
@@ -160,9 +160,9 @@ pub(crate) unsafe fn unit_clear<PTC: PTCVersion>() {
 
         let unit_rect = PTC::get_unit_rect();
 
-        let x = unit_rect.left - *PTC::get_scroll() + LAST_SCROLL;
-        LAST_PLAYHEAD_POS = x;
+        let x = unit_rect.left - *PTC::get_scroll() + unsafe { LAST_SCROLL };
+        unsafe { LAST_PLAYHEAD_POS = x };
 
-        InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap();
+        unsafe { InvalidateRect(Some(*PTC::get_hwnd()), None, false).unwrap() };
     }
 }

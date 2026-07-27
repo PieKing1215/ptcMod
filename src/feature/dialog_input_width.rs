@@ -45,51 +45,53 @@ const IDC_VOLUME: i32 = 1129;
 const IDC_SPIN_VALUE: i32 = 1107;
 
 pub(crate) unsafe fn modify_dialog(h_dlg: *mut c_void) {
-    let h_dlg = HWND(h_dlg);
+    unsafe {
+        let h_dlg = HWND(h_dlg);
 
-    // grow the edit field
-    let h_edit = GetDlgItem(Some(h_dlg), IDC_VOLUME).unwrap();
+        // grow the edit field
+        let h_edit = GetDlgItem(Some(h_dlg), IDC_VOLUME).unwrap();
 
-    let mut rc = RECT::default();
-    GetWindowRect(h_edit, &raw mut rc).unwrap();
+        let mut rc = RECT::default();
+        GetWindowRect(h_edit, &raw mut rc).unwrap();
 
-    MapWindowPoints(
-        None,
-        Some(h_dlg),
-        std::slice::from_raw_parts_mut((&raw mut rc).cast::<POINT>(), 2),
-    );
+        MapWindowPoints(
+            None,
+            Some(h_dlg),
+            std::slice::from_raw_parts_mut((&raw mut rc).cast::<POINT>(), 2),
+        );
 
-    let grow = 4;
-    SetWindowPos(
-        h_edit,
-        None,
-        rc.left - grow,
-        rc.top,
-        rc.right - rc.left + grow * 2,
-        rc.bottom - rc.top,
-        SWP_NOZORDER,
-    )
-    .unwrap();
+        let grow = 4;
+        SetWindowPos(
+            h_edit,
+            None,
+            rc.left - grow,
+            rc.top,
+            rc.right - rc.left + grow * 2,
+            rc.bottom - rc.top,
+            SWP_NOZORDER,
+        )
+        .unwrap();
 
-    // reposition the up/down spinner
-    let h_spin = GetDlgItem(Some(h_dlg), IDC_SPIN_VALUE).unwrap();
+        // reposition the up/down spinner
+        let h_spin = GetDlgItem(Some(h_dlg), IDC_SPIN_VALUE).unwrap();
 
-    GetWindowRect(h_spin, &raw mut rc).unwrap();
+        GetWindowRect(h_spin, &raw mut rc).unwrap();
 
-    MapWindowPoints(
-        None,
-        Some(h_dlg),
-        std::slice::from_raw_parts_mut((&raw mut rc).cast::<POINT>(), 2),
-    );
+        MapWindowPoints(
+            None,
+            Some(h_dlg),
+            std::slice::from_raw_parts_mut((&raw mut rc).cast::<POINT>(), 2),
+        );
 
-    SetWindowPos(
-        h_spin,
-        None,
-        rc.left + grow,
-        rc.top,
-        rc.right - rc.left,
-        rc.bottom - rc.top,
-        SWP_NOZORDER,
-    )
-    .unwrap();
+        SetWindowPos(
+            h_spin,
+            None,
+            rc.left + grow,
+            rc.top,
+            rc.right - rc.left,
+            rc.bottom - rc.top,
+            SWP_NOZORDER,
+        )
+        .unwrap();
+    }
 }

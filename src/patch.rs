@@ -17,7 +17,8 @@ impl Patch {
     }
 
     pub unsafe fn apply(&self) -> anyhow::Result<()> {
-        let mem = std::slice::from_raw_parts_mut(addr(self.addr) as *mut u8, self.old.len());
+        let mem =
+            unsafe { std::slice::from_raw_parts_mut(addr(self.addr) as *mut u8, self.old.len()) };
 
         log::debug!(
             "Patching @ {:#x} (apply). Expect {:x?} found {:x?}",
@@ -27,23 +28,27 @@ impl Patch {
         );
         if self.old == mem {
             let mut lpfl_old_protect_1 = PAGE_PROTECTION_FLAGS::default();
-            VirtualProtect(
-                addr(self.addr) as *mut libc::c_void,
-                mem.len(),
-                PAGE_EXECUTE_READWRITE,
-                &raw mut lpfl_old_protect_1,
-            )
-            .unwrap();
+            unsafe {
+                VirtualProtect(
+                    addr(self.addr) as *mut libc::c_void,
+                    mem.len(),
+                    PAGE_EXECUTE_READWRITE,
+                    &raw mut lpfl_old_protect_1,
+                )
+                .unwrap();
+            };
 
             mem.copy_from_slice(&self.new);
 
-            VirtualProtect(
-                addr(self.addr) as *mut libc::c_void,
-                mem.len(),
-                lpfl_old_protect_1,
-                &raw mut lpfl_old_protect_1,
-            )
-            .unwrap();
+            unsafe {
+                VirtualProtect(
+                    addr(self.addr) as *mut libc::c_void,
+                    mem.len(),
+                    lpfl_old_protect_1,
+                    &raw mut lpfl_old_protect_1,
+                )
+                .unwrap();
+            };
 
             log::debug!("-> {mem:x?}");
             Ok(())
@@ -58,7 +63,8 @@ impl Patch {
     }
 
     pub unsafe fn unapply(&self) -> anyhow::Result<()> {
-        let mem = std::slice::from_raw_parts_mut(addr(self.addr) as *mut u8, self.new.len());
+        let mem =
+            unsafe { std::slice::from_raw_parts_mut(addr(self.addr) as *mut u8, self.new.len()) };
 
         log::debug!(
             "Patching @ {:#x} (unapply). Expect {:x?} found {:x?}",
@@ -68,23 +74,27 @@ impl Patch {
         );
         if self.new == mem {
             let mut lpfl_old_protect = PAGE_PROTECTION_FLAGS::default();
-            VirtualProtect(
-                addr(self.addr) as *mut libc::c_void,
-                mem.len(),
-                PAGE_EXECUTE_READWRITE,
-                &raw mut lpfl_old_protect,
-            )
-            .unwrap();
+            unsafe {
+                VirtualProtect(
+                    addr(self.addr) as *mut libc::c_void,
+                    mem.len(),
+                    PAGE_EXECUTE_READWRITE,
+                    &raw mut lpfl_old_protect,
+                )
+                .unwrap();
+            };
 
             mem.copy_from_slice(&self.old);
 
-            VirtualProtect(
-                addr(self.addr) as *mut libc::c_void,
-                mem.len(),
-                lpfl_old_protect,
-                &raw mut lpfl_old_protect,
-            )
-            .unwrap();
+            unsafe {
+                VirtualProtect(
+                    addr(self.addr) as *mut libc::c_void,
+                    mem.len(),
+                    lpfl_old_protect,
+                    &raw mut lpfl_old_protect,
+                )
+                .unwrap();
+            };
 
             log::debug!("-> {mem:x?}");
 
@@ -124,6 +134,7 @@ macro_rules! replace {
     ( $call_addr:expr, $fn_addr:expr, $cc:expr, fn($($p_name:ident: $p_type:ty),*)$( -> $ret:ty)?, $my_fn:expr ) => {
         {
             unsafe extern $cc fn func($($p_name: $p_type),*)$( -> $ret)* {
+                #[allow(unsafe_op_in_unsafe_fn)]
                 $my_fn($($p_name),*)
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
@@ -141,10 +152,11 @@ macro_rules! hook_pre_ret_new {
     ( $call_addr:expr, $fn_addr:expr, $cc:expr, fn($($p_name:ident: $p_type:ty),*)$( -> $ret:ty)?, $my_fn:expr ) => {
         {
             unsafe extern $cc fn func($($p_name: $p_type,)*)$( -> $ret)* {
+                #[allow(unsafe_op_in_unsafe_fn)]
                 let ret = $my_fn($($p_name),*);
                 let raw_fn: unsafe extern $cc fn($($p_name: $p_type),*)$( -> $ret)* =
-                    std::mem::transmute(addr($fn_addr) as *const ());
-                (raw_fn)($($p_name),*);
+                    unsafe { std::mem::transmute(addr($fn_addr) as *const ()) };
+                unsafe { (raw_fn)($($p_name),*) };
                 ret
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
@@ -163,8 +175,9 @@ macro_rules! hook_post_ret_new {
         {
             unsafe extern $cc fn func($($p_name: $p_type),*)$( -> $ret)* {
                 let raw_fn: unsafe extern $cc fn($($p_name: $p_type),*)$( -> $ret)* =
-                    std::mem::transmute(addr($fn_addr) as *const ());
-                (raw_fn)($($p_name),*);
+                    unsafe { std::mem::transmute(addr($fn_addr) as *const ()) };
+                unsafe { (raw_fn)($($p_name),*) };
+                #[allow(unsafe_op_in_unsafe_fn)]
                 $my_fn($($p_name),*)
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
@@ -182,10 +195,11 @@ macro_rules! hook_pre_ret_old {
     ( $call_addr:expr, $fn_addr:expr, $cc:expr, fn($($p_name:ident: $p_type:ty),*)$( -> $ret:ty)?, $my_fn:expr ) => {
         {
             unsafe extern $cc fn func($($p_name: $p_type,)*)$( -> $ret)* {
+                #[allow(unsafe_op_in_unsafe_fn)]
                 $my_fn($($p_name),*);
                 let raw_fn: unsafe extern $cc fn($($p_name: $p_type),*)$( -> $ret)* =
-                    std::mem::transmute(addr($fn_addr) as *const ());
-                (raw_fn)($($p_name),*)
+                    unsafe { std::mem::transmute(addr($fn_addr) as *const ()) };
+                unsafe { (raw_fn)($($p_name),*) }
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
         }
@@ -203,8 +217,9 @@ macro_rules! hook_post_ret_old {
         {
             unsafe extern $cc fn func($($p_name: $p_type),*)$( -> $ret)* {
                 let raw_fn: unsafe extern $cc fn($($p_name: $p_type),*)$( -> $ret)* =
-                    std::mem::transmute(addr($fn_addr) as *const ());
-                (raw_fn)($($p_name),*);
+                    unsafe { std::mem::transmute(addr($fn_addr) as *const ()) };
+                unsafe { (raw_fn)($($p_name),*) };
+                #[allow(unsafe_op_in_unsafe_fn)]
                 $my_fn($($p_name),*)
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
@@ -223,7 +238,7 @@ macro_rules! hook {
         {
             unsafe extern $cc fn func($($p_name: $p_type),*)$( -> $ret)* {
                 let raw_fn: unsafe extern $cc fn($($p_name: $p_type),*)$( -> $ret)* =
-                    std::mem::transmute(addr($fn_addr) as *const ());
+                    unsafe { std::mem::transmute(addr($fn_addr) as *const ()) };
                 $my_fn(raw_fn, $($p_name),*)
             }
             crate::patch::call_patch($call_addr, $fn_addr, func as *const ())
@@ -297,8 +312,10 @@ fn macro_usage() {
         "stdcall",
         fn(a: i32, b: usize) -> i32,
         |func: unsafe extern "stdcall" fn(a: i32, b: usize) -> i32, a, b| {
-            let r = func(a, b);
-            test_f::<PTC0925>(r, b)
+            unsafe {
+                let r = func(a, b);
+                test_f::<PTC0925>(r, b)
+            }
         }
     );
 }

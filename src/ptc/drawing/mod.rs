@@ -76,7 +76,7 @@ struct OffsetDraw<'a, T> {
 impl<T: Draw> Draw for OffsetDraw<'_, T> {
     unsafe fn fill_rect(&self, rect: &Rect<i32>, color: Color) {
         let ofs_rect = rect.offset(self.x, self.y);
-        self.inner.fill_rect(&ofs_rect, color);
+        unsafe { self.inner.fill_rect(&ofs_rect, color) };
     }
 
     unsafe fn fill_rect_batch(&self, rects: Vec<Rect<i32>>, color: Color) {
@@ -84,8 +84,10 @@ impl<T: Draw> Draw for OffsetDraw<'_, T> {
             .into_iter()
             .map(|rect| rect.offset(self.x, self.y))
             .collect();
-        #[expect(deprecated)]
-        self.inner.fill_rect_batch(ofs_rects, color);
+        unsafe {
+            #[expect(deprecated)]
+            self.inner.fill_rect_batch(ofs_rects, color);
+        };
     }
 
     fn set_pixels(&self, modify: impl FnOnce(&mut dyn FnMut(i32, i32, Color))) {
