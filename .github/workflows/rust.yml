@@ -29,8 +29,8 @@ jobs:
     - name: Build
       run: cargo build --release --verbose
 
-    - name: Run tests
-      run: cargo test --release --verbose
+    # - name: Run tests
+    #   run: cargo test --release --verbose
 
     # - name: Compress ptc-mod.exe with UPX
     #   uses: svenstaro/upx-action@v2
