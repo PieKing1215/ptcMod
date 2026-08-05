@@ -162,8 +162,8 @@ impl<PTC: PTCVersion> Runtime<PTC> {
                 let mut msg = MSG::default();
                 if PeekMessageA(&raw mut msg, None, 0, 0, PM_REMOVE).as_bool() {
                     did_something = true;
-                    // TODO: this unwrap triggers with "Invalid window handle" sometimes (possibly after sleeping?)
-                    TranslateMessage(&raw const msg).unwrap();
+                    // TranslateMessage's BOOL return does not represent an error and we don't care about it
+                    let _ = TranslateMessage(&raw const msg);
                     DispatchMessageA(&raw const msg);
                 }
 
