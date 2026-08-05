@@ -1,3 +1,22 @@
 {
-    "rust-analyzer.check.command": "clippy"
+    "rust-analyzer.check.overrideCommand": [
+        "cargo",
+        "xwin",
+        "clippy",
+        "--message-format=json-diagnostic-rendered-ansi",
+        "--target=i686-pc-windows-msvc",
+        "--xwin-arch=x86",
+        "--workspace",
+        "--keep-going",
+    ],
+    "rust-analyzer.cargo.buildScripts.overrideCommand": [
+        "cargo",
+        "xwin",
+        "clippy",
+        "--message-format=json-diagnostic-rendered-ansi",
+        "--target=i686-pc-windows-msvc",
+        "--xwin-arch=x86",
+        "--workspace",
+        "--keep-going",
+    ]
 }

@@ -1,4 +1,5 @@
 use std::{
+    ffi::CString,
     fs::File,
     path::PathBuf,
     ptr,
@@ -7,6 +8,7 @@ use std::{
         LazyLock,
         atomic::{AtomicU32, Ordering},
     },
+    time::Duration,
 };
 
 use regex::Regex;
@@ -18,7 +20,7 @@ use windows::{
             Com::{DVASPECT_CONTENT, FORMATETC, IDataObject, TYMED_HGLOBAL},
             Memory::{GlobalLock, GlobalUnlock},
             Ole::{
-                CF_UNICODETEXT, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_NONE, IDropTarget,
+                CF_TEXT, CF_UNICODETEXT, DROPEFFECT, DROPEFFECT_COPY, DROPEFFECT_NONE, IDropTarget,
                 IDropTarget_Impl, OleInitialize, RegisterDragDrop, ReleaseStgMedium,
                 RevokeDragDrop,
             },
@@ -74,6 +76,11 @@ impl DragAndDrop {
             get_hwnd_fn: PTC::get_hwnd,
             state: DROPEFFECT_NONE.0.into(),
         };
+
+        // needed since we're using reqwest's "rustls-no-provider" feature to avoid aws-lc (since it complicates building on linux)
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .unwrap();
 
         Self { data }
     }
@@ -176,13 +183,14 @@ impl IDropTarget_Impl for DropHandlerData_Impl {
     ) -> windows::core::Result<()> {
         // if the dropped item is text and is a ptweb url, get the id
         // (the capture group for id explicitly allows '/' so it can match private urls)
-        let re =
-            Regex::new(r"^https?://www\.ptweb\.me/(?:play|get|full)/([a-zA-Z0-9/]+)$").unwrap();
+        let re = Regex::new(r"^https?://(?:www\.)?ptweb\.me/(?:play|get|full)/([a-zA-Z0-9/]+)$")
+            .unwrap();
         let var_name = unsafe { get_text(pdataobj.unwrap()) };
         let id = var_name.as_ref().and_then(|txt| {
             re.captures(txt.as_str())
                 .and_then(|cap| cap.get(1).map(|m| m.as_str().to_string()))
         });
+        log::debug!("Drop {var_name:?} -> {id:?}");
 
         if let Some(id) = id {
             // format url for download
@@ -190,19 +198,33 @@ impl IDropTarget_Impl for DropHandlerData_Impl {
 
             log::info!("GET {url}");
 
-            let res = reqwest::blocking::get(url)
-                .map_err(|e| format!("GET request failed: {e:?}"))
-                .and_then(|resp| {
+            let res = reqwest::blocking::Client::builder()
+                .user_agent(concat!(
+                    env!("CARGO_PKG_NAME"),
+                    "/",
+                    env!("CARGO_PKG_VERSION"),
+                ))
+                .connect_timeout(Duration::from_secs(5))
+                .timeout(Duration::from_secs(5))
+                .build()
+                .map_err(|e| format!("Failed to build http client: {e:?}"))
+                .and_then(|client| {
+                    client
+                        .get(url)
+                        .send()
+                        .map_err(|e| format!("GET request failed: {e:?}"))
+                })
+                .and_then(|resp: reqwest::blocking::Response| {
                     // got a response, check if 200
-                    log::debug!("{resp:?}");
-
                     if resp.status() == reqwest::StatusCode::OK {
                         Ok(resp)
                     } else {
-                        Err(format!("Response was: {}", resp.status()))
+                        Err(format!("Response was: {resp:#?}"))
                     }
                 })
                 .and_then(|resp| {
+                    log::debug!("Creating temp folder...");
+
                     // make temp folder
                     let mut pb = PathBuf::new();
                     pb.push("ptweb/");
@@ -211,6 +233,8 @@ impl IDropTarget_Impl for DropHandlerData_Impl {
                         .map(|()| (resp, pb))
                 })
                 .and_then(|(resp, mut pb)| {
+                    log::debug!("Getting file name...");
+
                     // try to extract filename from headers, otherwise use {id}.ptcop
                     let fname = resp
                         .headers()
@@ -224,6 +248,8 @@ impl IDropTarget_Impl for DropHandlerData_Impl {
                         .map(ToString::to_string)
                         .unwrap_or(format!("{id}.ptcop"));
 
+                    log::debug!("Creating temp file {fname}...");
+
                     // make file in the temp folder
                     pb.push(fname);
                     File::create(pb.clone())
@@ -231,8 +257,16 @@ impl IDropTarget_Impl for DropHandlerData_Impl {
                         .map(|f| (resp, f, pb))
                 })
                 .and_then(|(resp, mut f, pb)| {
+                    log::debug!("Reading response bytes...");
+
+                    let bytes = &mut resp
+                        .bytes()
+                        .map_err(|e| format!("Failed to get response bytes: {e:?}"))?;
+
+                    log::debug!("Writing temp file...");
+
                     // copy payload bytes into file
-                    std::io::copy(&mut resp.bytes().unwrap().as_ref(), &mut f)
+                    std::io::copy(&mut bytes.as_ref(), &mut f)
                         .map_err(|e| format!("Failed to write file: {e:?}"))
                         .map(|_| pb)
                 })
@@ -268,6 +302,7 @@ impl IDropTarget_Impl for DropHandlerData_Impl {
 }
 
 unsafe fn get_text(p_data_obj: &IDataObject) -> Option<String> {
+    // try get unicode text first (eg. wine seems to only implement unicode text?)
     let format = FORMATETC {
         cfFormat: CF_UNICODETEXT.0,
         ptd: ptr::null_mut(),
@@ -287,7 +322,22 @@ unsafe fn get_text(p_data_obj: &IDataObject) -> Option<String> {
             ReleaseStgMedium(&raw mut storage);
             Some(str)
         } else {
-            None
+            // try get as plain text as fallback
+
+            let format = FORMATETC { cfFormat: CF_TEXT.0, ..format };
+
+            let r = p_data_obj.GetData(&raw const format);
+            if let Ok(mut storage) = r {
+                let ptr = GlobalLock(storage.u.hGlobal).cast::<i8>();
+                let txt = CString::from_raw(ptr);
+                let str = txt.to_str().unwrap().to_string();
+
+                let _ = GlobalUnlock(storage.u.hGlobal);
+                ReleaseStgMedium(&raw mut storage);
+                Some(str)
+            } else {
+                None
+            }
         }
     }
 }

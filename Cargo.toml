@@ -22,7 +22,10 @@ colorsys = "0.7"
 path-absolutize = "4.0" # so we can get absolute paths to missing files
 lazy_static = "1.4"
 regex = "1.5"
-reqwest = { version = "0.12", features = ["blocking"] } # going to 0.13 adds dep on aws-lc-sys which creates a bunch of build errors on nixos I'd need to figure out
+# using the default "rustls" pulls in aws-lc-sys which causes build issues on my setup, and going back to native-tls causes sporadic response reading timeouts
+# so need to install ring provider manually
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 widestring = "1.2"
 static_assertions = "1.1.0"
 
